@@ -1,0 +1,585 @@
+// PACKAGES FOR ADVANCED REMESHING SCHEME
+load "Curvature"
+load "distance"
+load "isoline"
+load "gsl"
+load "ffrandom"
+
+//include <iostream>;
+
+real cut = pi/2.;						// Angular length of the cutted portion of the circle
+real ThickOutMesh =  0.2;		// Thickness of the outer mesh
+real fracRarc = 0.1;				// adimensionalized radius used to smooth the domain vertices
+real obd = 15.;  						// Outer boundary mesh density
+real ibd = 5.;	 						// Inner boundary mesh density
+
+/*// Perturbations of the circular domain with 1 cut, smoth with 1/f = 0
+mesh Th,Thb;
+  real[int] AxisCut = [3.*pi/2.];
+  real Rarc = fracRarc;
+  real t1 = acos((cos(cut/2.)-Rarc)/(1-Rarc));
+
+	real[int] OxPlus = [(1-Rarc)*cos(AxisCut[0]+t1)];
+	real[int] OyPlus = [(1-Rarc)*sin(AxisCut[0]+t1)];
+	real[int] OxMin = [(1-Rarc)*cos(AxisCut[0]-t1)];
+	real[int] OyMin = [(1-Rarc)*sin(AxisCut[0]-t1)];
+	real LenCut = sqrt((OxPlus[0]-OxMin[0])*(OxPlus[0]-OxMin[0]) + (OyPlus[0]-OyMin[0])*(OyPlus[0]-OyMin[0]));
+
+  border GammaArchMin0(t=0,1){x=OxMin[0]+Rarc*cos(AxisCut[0]-t1*(1-t)); y=OyMin[0]+Rarc*sin(AxisCut[0]-t1*(1-t)); label=1;}
+	border GammaCut0(t=0,1){x=((OxMin[0]+Rarc*cos(AxisCut[0]))+(OxPlus[0]-OxMin[0])*t);
+													y=((OyMin[0]+Rarc*sin(AxisCut[0]))+(OyPlus[0]-OyMin[0])*t);label=1;}
+	border GammaArchPlus0(t=0,1){x=OxPlus[0]+Rarc*cos(AxisCut[0]+t1*t); y=OyPlus[0]+Rarc*sin(AxisCut[0]+t1*t); label=1;}
+	border GammaArch0(t=0,1){x=cos(AxisCut[0]+t1+2*(pi-t1)*t);
+													 y=sin(AxisCut[0]+t1+2*(pi-t1)*t);label=1;}
+
+
+	Th=buildmesh(GammaArchMin0(obd*Rarc*t1)
+							+GammaCut0(obd*LenCut)
+							+GammaArchPlus0(obd*Rarc*t1)
+							+GammaArch0(obd*2*(pi-t1))
+							);
+
+  // Smooth the outer boundary pieces
+  real[int,int] b1(3,1); real l1=extractborder(Th,1,b1); // l1 is the permiter of b1
+  gslspline splineX(gslinterpakima, b1(2, :), b1(0, :)); 	// x(s) akima spline
+  gslspline splineY(gslinterpakima, b1(2, :), b1(1, :)); 	// y(s) akima spline
+  border Outer(t=0,l1){x=splineX(t);y=splineY(t);label=1;}
+  int nO = round(obd*l1);
+
+	// Transform the dense mesh & into an adaptive one
+	fespace Dini(Th, P1);	// Distance function to define the contour region of the mesh
+
+	varf vong(B, d)= on(1,B=1);
+	real[int] ong=vong(0,Dini);
+	Dini B =1, d;
+	B[] = ong ? 0 : B[];
+	distance(Th,B,d[]);
+
+	// Get the new inner boundary vertices (ISO is the contour d==nu)
+	real[int,int] ISO(3,1); int nc=isoline(Th,d,iso=ThickOutMesh,close=1,ISO,smoothing=ThickOutMesh/2.,ratio=1.e-0);
+  real l2=ISO(2,ISO.m-1); // l2 is the perimeter of ISO
+	border Inner(t=0,1){ P=Curve(ISO,t);label=2;}
+	int nI = round(ibd*l2); 						// new number of elements (prescribed density ibd)
+
+	// C. BUILD NEW MESH
+	Th=buildmesh(Outer(nO)+Inner(nI),fixedborder=1);
+	Th=change(Th,rmInternalEdges=1);
+	Thb=emptymesh(Th);*/
+
+/*// Sinusoidal perturbations of the domain
+mesh Th,Thb;
+  int perturbMode = 3;
+  int ampFrac = 160;
+  real wavelenght = 2*pi/perturbMode;  // Frequency
+  real Amp = wavelenght/ampFrac;     // Amplitude of the sinusoidal perturbation
+  real shift = pi/2.;                  // Shift
+  border Gamma(t=0,2*pi){x=(1+Amp*sin(2*pi*t/wavelenght+shift))*cos(t);
+  	                     y=(1+Amp*sin(2*pi*t/wavelenght+shift))*sin(t); label=1;}
+  Th=buildmesh(Gamma(obd*2*pi));
+
+  // Transform a dense mesh into an adaptive one
+  fespace Dini(Th, P1);	// Distance function to define the contour region of the mesh
+
+  varf vong(B, d)= on(1,B=1);
+  real[int] ong=vong(0,Dini);
+  Dini B =1, d;
+  B[] = ong ? 0 : B[];
+  distance(Th,B,d[]);
+  // Get the new inner boundary vertices (ISO is the contaur d==nu)
+  real[int,int] ISO(3,1); int nc=isoline(Th,d,iso=ThickOutMesh,close=1,ISO,smoothing=ThickOutMesh/2.,ratio=1.e-0);
+  real l2=ISO(2,ISO.m-1); // l2 is the perimeter of ISO
+  border Inner(t=0,1){ P=Curve(ISO,t);label=0;}
+  int nI = round(ibd*l2); 						// new number of elements (prescribed density ibd)
+  // C. BUILD NEW MESH
+  Th=buildmesh(Gamma(obd*2*pi)+Inner(nI),fixedborder=1);
+  Th=change(Th,rmInternalEdges=true);
+  Thb=emptymesh(Th);*/
+
+/*//Sinusoidal perturbations of the domain with mixed modes
+mesh Th,Thb;
+ int ampFrac = 80;
+ real Amp = 2*pi/(2*ampFrac);     // Amplitude of the sinusoidal perturbation
+
+ border Gamma(t=0,2*pi){x=(1+Amp*(sin(2*t-pi/2)-sin(3*t)))*cos(t);
+                        y=(1+Amp*(sin(2*t-pi/2)-sin(3*t)))*sin(t); label=1;}
+ Th=buildmesh(Gamma(obd*2*pi));
+
+ // Transform a dense mesh into an adaptive one
+ fespace Dini(Th, P1);	// Distance function to define the contour region of the mesh
+
+ varf vong(B, d)= on(1,B=1);
+ real[int] ong=vong(0,Dini);
+ Dini B =1, d;
+ B[] = ong ? 0 : B[];
+ distance(Th,B,d[]);
+ // Get the new inner boundary vertices (ISO is the contaur d==nu)
+ real[int,int] ISO(3,1); int nc=isoline(Th,d,iso=ThickOutMesh,close=1,ISO,smoothing=ThickOutMesh/2.,ratio=1.e-0);
+ real l2=ISO(2,ISO.m-1); // l2 is the perimeter of ISO
+ border Inner(t=0,1){ P=Curve(ISO,t);label=0;}
+ int nI = round(ibd*l2); 						// new number of elements (prescribed density ibd)
+ // C. BUILD NEW MESH
+ Th=buildmesh(Gamma(obd*2*pi)+Inner(nI),fixedborder=1);
+ Th=change(Th,rmInternalEdges=true);
+ Thb=emptymesh(Th);*/
+
+/*// Square domain
+mesh Th,Thb;
+	int Nsides = 4;
+	real Rarc = fracRarc;
+	real t0 = 2.*pi/Nsides;
+	real t1 = (Nsides-2)*pi/Nsides;
+
+	real AxisIni = pi/2.;
+
+	real[int] Ox = [(1-2.*Rarc*sin(t1)*cos(t1/2.))*cos(AxisIni),(1-2.*Rarc*sin(t1)*cos(t1/2.))*cos(AxisIni+t0),(1-2.*Rarc*sin(t1)*cos(t1/2.))*cos(AxisIni+2*t0),(1-2.*Rarc*sin(t1)*cos(t1/2.))*cos(AxisIni+3*t0)];
+	real[int] Oy = [(1-2.*Rarc*sin(t1)*cos(t1/2.))*sin(AxisIni),(1-2.*Rarc*sin(t1)*cos(t1/2.))*sin(AxisIni+t0),(1-2.*Rarc*sin(t1)*cos(t1/2.))*sin(AxisIni+2*t0),(1-2.*Rarc*sin(t1)*cos(t1/2.))*sin(AxisIni+3*t0)];
+
+	real LenSide = sqrt((Ox[1]-Ox[0])*(Ox[1]-Ox[0]) + (Oy[1]-Oy[0])*(Oy[1]-Oy[0]));
+
+	border GammaRound0(t=0,1){x=Ox[0]+Rarc*cos(AxisIni-t0/2.+t0*t); y=Oy[0]+Rarc*sin(AxisIni-t0/2.+t0*t); label=1;}
+	border GammaSide0(t=0,1){x=Ox[0]+Rarc*cos(AxisIni+t0/2)+(Ox[1]-Ox[0])*t; y=Oy[0]+Rarc*sin(AxisIni+t0/2)+(Oy[1]-Oy[0])*t; label=1;}
+
+	border GammaRound1(t=0,1){x=Ox[1]+Rarc*cos(AxisIni+t0/2.+t0*t); y=Oy[1]+Rarc*sin(AxisIni+t0/2.+t0*t); label=1;}
+	border GammaSide1(t=0,1){x=Ox[1]+Rarc*cos(AxisIni+3*t0/2)+(Ox[2]-Ox[1])*t; y=Oy[1]+Rarc*sin(AxisIni+3*t0/2)+(Oy[2]-Oy[1])*t; label=1;}
+
+	border GammaRound2(t=0,1){x=Ox[2]+Rarc*cos(AxisIni+3*t0/2.+t0*t); y=Oy[2]+Rarc*sin(AxisIni+3*t0/2.+t0*t); label=1;}
+	border GammaSide2(t=0,1){x=Ox[2]+Rarc*cos(AxisIni+5*t0/2)+(Ox[3]-Ox[2])*t; y=Oy[2]+Rarc*sin(AxisIni+5*t0/2)+(Oy[3]-Oy[2])*t; label=1;}
+
+	border GammaRound3(t=0,1){x=Ox[3]+Rarc*cos(AxisIni+5*t0/2.+t0*t); y=Oy[3]+Rarc*sin(AxisIni+5*t0/2.+t0*t); label=1;}
+	border GammaSide3(t=0,1){x=Ox[3]+Rarc*cos(AxisIni+7*t0/2)+(Ox[0]-Ox[3])*t; y=Oy[3]+Rarc*sin(AxisIni+7*t0/2)+(Oy[0]-Oy[3])*t; label=1;}
+
+	Th=buildmesh(GammaRound0(obd*Rarc*t0)
+							+GammaSide0(obd*LenSide)
+							+GammaRound1(obd*Rarc*t0)
+							+GammaSide1(obd*LenSide)
+							+GammaRound2(obd*Rarc*t0)
+							+GammaSide2(obd*LenSide)
+							+GammaRound3(obd*Rarc*t0)
+							+GammaSide3(obd*LenSide)
+							);
+
+	// Transform a dense mesh into an adaptive one
+	fespace Dini(Th, P1);	// Distance function to define the contour region of the mesh
+
+	varf vong(B, d)= on(1,B=1);
+	real[int] ong=vong(0,Dini);
+	Dini B =1, d;
+	B[] = ong ? 0 : B[];
+	distance(Th,B,d[]);
+	// Get the new inner boundary vertices (ISO is the contaur d==nu)
+	real[int,int] ISO(3,1); int nc=isoline(Th,d,iso=ThickOutMesh,close=1,ISO,smoothing=ThickOutMesh/2.,ratio=1.e-0);
+	real l2=ISO(2,ISO.m-1); // l2 is the perimeter of ISO
+	border Inner(t=0,1){ P=Curve(ISO,t);label=2;}
+	int nI = round(ibd*l2); 						// new number of elements (prescribed density ibd)
+	// C. BUILD NEW MESH
+	Th=buildmesh(GammaRound0(obd*Rarc*t0)
+							+GammaSide0(obd*LenSide)
+							+GammaRound1(obd*Rarc*t0)
+							+GammaSide1(obd*LenSide)
+							+GammaRound2(obd*Rarc*t0)
+							+GammaSide2(obd*LenSide)
+							+GammaRound3(obd*Rarc*t0)
+							+GammaSide3(obd*LenSide)
+							+Inner(nI),fixedborder=1
+							);
+	Th=change(Th,rmInternalEdges=1);
+	Thb=emptymesh(T);
+*/
+
+/*// Rotating fan domain
+mesh Th,Thb;
+  real maxWidth = 1.;
+	real Rsmall = fracRarc;
+  real Rbig = maxWidth-Rsmall;
+
+	real AxisIni = 0.;
+
+	real[int] OxBig = [(maxWidth/2.-Rsmall)*cos(AxisIni+pi/2.),(maxWidth/2.-Rsmall)*cos(AxisIni+3*pi/2.)];
+	real[int] OyBig = [(maxWidth/2.-Rsmall)*sin(AxisIni+pi/2.),(maxWidth/2.-Rsmall)*sin(AxisIni+3*pi/2.)];
+
+  real[int] OxSmall = [OxBig[0]+(Rbig-Rsmall)*cos(AxisIni+pi),OxBig[1]+(Rbig-Rsmall)*cos(AxisIni+2*pi)];
+	real[int] OySmall = [OyBig[0]+(Rbig-Rsmall)*sin(AxisIni+pi),OyBig[1]+(Rbig-Rsmall)*sin(AxisIni+2*pi)];
+
+  border GammaSide0(t=0,1){x=(maxWidth/2.)*cos(AxisIni+pi/2.)+(OxSmall[0]-OxBig[0])*t; y=(maxWidth/2.)*sin(AxisIni+pi/2.)+(OySmall[0]-OyBig[0])*t; label=1;}
+  border GammaSmallArch0(t=0,1){x=OxSmall[0]+Rsmall*cos(AxisIni+(pi/2.)*(t+1)); y=OySmall[0]+Rsmall*sin(AxisIni+(pi/2.)*(t+1)); label=1;}
+  border GammaBigArch0(t=0,1){x=OxBig[0]+Rbig*cos(AxisIni+(pi/2.)*(t+2)); y=OyBig[0]+Rbig*sin(AxisIni+(pi/2.)*(t+2)); label=1;}
+
+  border GammaSide1(t=0,1){x=(maxWidth/2.)*cos(AxisIni+3*pi/2.)+(OxSmall[1]-OxBig[1])*t; y=(maxWidth/2.)*sin(AxisIni+3*pi/2.)+(OySmall[1]-OyBig[1])*t; label=1;}
+  border GammaSmallArch1(t=0,1){x=OxSmall[1]+Rsmall*cos(AxisIni+(pi/2.)*(t+3)); y=OySmall[1]+Rsmall*sin(AxisIni+(pi/2.)*(t+3)); label=1;}
+  border GammaBigArch1(t=0,1){x=OxBig[1]+Rbig*cos(AxisIni+(pi/2.)*(t+4)); y=OyBig[1]+Rbig*sin(AxisIni+(pi/2.)*(t+4)); label=1;}
+
+	Th=buildmesh(GammaSide0(obd*(Rbig-Rsmall))
+              +GammaSmallArch0(obd*Rsmall*pi/2.)
+              +GammaBigArch0(obd*Rbig*pi/2.)
+              +GammaSide1(obd*(Rbig-Rsmall))
+              +GammaSmallArch1(obd*Rsmall*pi/2.)
+              +GammaBigArch1(obd*Rbig*pi/2.)
+							);
+
+  // Smooth the outer boundary pieces
+  real[int,int] b1(3,1); real l1=extractborder(Th,1,b1); // l1 is the permiter of b1
+  gslspline splineX(gslinterpakima, b1(2, :), b1(0, :)); 	// x(s) akima spline
+  gslspline splineY(gslinterpakima, b1(2, :), b1(1, :)); 	// y(s) akima spline
+  border Outer(t=0,l1){x=splineX(t);y=splineY(t);label=1;}
+  int nO = round(obd*l1);
+
+	// Transform a dense mesh into an adaptive one
+	fespace Dini(Th, P1);	// Distance function to define the contour region of the mesh
+
+	varf vong(B, d)= on(1,B=1);
+	real[int] ong=vong(0,Dini);
+	Dini B =1, d;
+	B[] = ong ? 0 : B[];
+	distance(Th,B,d[]);
+	// Get the new inner boundary vertices (ISO is the contaur d==nu)
+	real[int,int] ISO(3,1); int nc=isoline(Th,d,iso=ThickOutMesh,close=1,ISO,smoothing=ThickOutMesh/2.,ratio=1.e-0);
+	real l2=ISO(2,ISO.m-1); // l2 is the perimeter of ISO
+	border Inner(t=0,1){ P=Curve(ISO,t);label=2;}
+	int nI = round(ibd*l2); 						// new number of elements (prescribed density ibd)
+	// C. BUILD NEW MESH
+	Th=buildmesh(Outer(nO)+Inner(nI),fixedborder=1);
+	Th=change(Th,rmInternalEdges=1);
+	Thb=emptymesh(Th);*/
+
+/*// Triangle domain
+mesh Th,Thb;
+	int Nsides = 3;
+	real Rarc = fracRarc;
+	real t0 = 2.*pi/Nsides;
+	real t1 = (Nsides-2)*pi/Nsides;
+
+	real AxisIni = pi/2.;
+
+	real[int] Ox = [(1-2.*Rarc*sin(t1)*cos(t1/2.))*cos(AxisIni),(1-2.*Rarc*sin(t1)*cos(t1/2.))*cos(AxisIni+t0),(1-2.*Rarc*sin(t1)*cos(t1/2.))*cos(AxisIni+2*t0)];
+	real[int] Oy = [(1-2.*Rarc*sin(t1)*cos(t1/2.))*sin(AxisIni),(1-2.*Rarc*sin(t1)*cos(t1/2.))*sin(AxisIni+t0),(1-2.*Rarc*sin(t1)*cos(t1/2.))*sin(AxisIni+2*t0)];
+
+	real LenSide = sqrt((Ox[1]-Ox[0])*(Ox[1]-Ox[0]) + (Oy[1]-Oy[0])*(Oy[1]-Oy[0]));
+
+	border GammaRound0(t=0,1){x=Ox[0]+Rarc*cos(AxisIni-t0/2.+t0*t); y=Oy[0]+Rarc*sin(AxisIni-t0/2.+t0*t); label=1;}
+	border GammaSide0(t=0,1){x=Ox[0]+Rarc*cos(AxisIni+t0/2)+(Ox[1]-Ox[0])*t; y=Oy[0]+Rarc*sin(AxisIni+t0/2)+(Oy[1]-Oy[0])*t; label=1;}
+
+	border GammaRound1(t=0,1){x=Ox[1]+Rarc*cos(AxisIni+t0/2.+t0*t); y=Oy[1]+Rarc*sin(AxisIni+t0/2.+t0*t); label=1;}
+	border GammaSide1(t=0,1){x=Ox[1]+Rarc*cos(AxisIni+3*t0/2)+(Ox[2]-Ox[1])*t; y=Oy[1]+Rarc*sin(AxisIni+3*t0/2)+(Oy[2]-Oy[1])*t; label=1;}
+
+	border GammaRound2(t=0,1){x=Ox[2]+Rarc*cos(AxisIni+3*t0/2.+t0*t); y=Oy[2]+Rarc*sin(AxisIni+3*t0/2.+t0*t); label=1;}
+	border GammaSide2(t=0,1){x=Ox[2]+Rarc*cos(AxisIni+5*t0/2)+(Ox[0]-Ox[2])*t; y=Oy[2]+Rarc*sin(AxisIni+5*t0/2)+(Oy[0]-Oy[2])*t; label=1;}
+
+	Th=buildmesh(GammaRound0(obd*Rarc*t0)
+							+GammaSide0(obd*LenSide)
+							+GammaRound1(obd*Rarc*t0)
+							+GammaSide1(obd*LenSide)
+							+GammaRound2(obd*Rarc*t0)
+							+GammaSide2(obd*LenSide)
+							);
+
+	// Transform a dense mesh into an adaptive one
+	fespace Dini(Th, P1);	// Distance function to define the contour region of the mesh
+
+	varf vong(B, d)= on(1,B=1);
+	real[int] ong=vong(0,Dini);
+	Dini B =1, d;
+	B[] = ong ? 0 : B[];
+	distance(Th,B,d[]);
+	// Get the new inner boundary vertices (ISO is the contaur d==nu)
+	real[int,int] ISO(3,1); int nc=isoline(Th,d,iso=ThickOutMesh,close=1,ISO,smoothing=ThickOutMesh/2.,ratio=1.e-0);
+	real l2=ISO(2,ISO.m-1); // l2 is the perimeter of ISO
+	border Inner(t=0,1){ P=Curve(ISO,t);label=2;}
+	int nI = round(ibd*l2); 						// new number of elements (prescribed density ibd)
+	// C. BUILD NEW MESH
+	Th=buildmesh(GammaRound0(obd*Rarc*t0)
+							+GammaSide0(obd*LenSide)
+							+GammaRound1(obd*Rarc*t0)
+							+GammaSide1(obd*LenSide)
+							+GammaRound2(obd*Rarc*t0)
+							+GammaSide2(obd*LenSide)
+							+Inner(nI),fixedborder=1
+							);
+	Th=change(Th,rmInternalEdges=1);
+	Thb=emptymesh(T);
+*/
+
+// Perturbations of the circular domain with 1 cut, smoth with 1/f = 0
+mesh Th,Thb;
+  real[int] AxisCut = [3*pi/2.];
+	real Rarc = fracRarc;
+  real t1 = acos((cos(cut/2.)-Rarc)/(1-Rarc));
+
+	real[int] OxPlus = [(1-Rarc)*cos(AxisCut[0]+t1)];
+	real[int] OyPlus = [(1-Rarc)*sin(AxisCut[0]+t1)];
+	real[int] OxMin = [(1-Rarc)*cos(AxisCut[0]-t1)];
+	real[int] OyMin = [(1-Rarc)*sin(AxisCut[0]-t1)];
+	real LenCut = sqrt((OxPlus[0]-OxMin[0])*(OxPlus[0]-OxMin[0]) + (OyPlus[0]-OyMin[0])*(OyPlus[0]-OyMin[0]));
+
+  border GammaArchMin0(t=0,1){x=OxMin[0]+Rarc*cos(AxisCut[0]-t1*(1-t)); y=OyMin[0]+Rarc*sin(AxisCut[0]-t1*(1-t)); label=1;}
+	border GammaCut0(t=0,1){x=((OxMin[0]+Rarc*cos(AxisCut[0]))+(OxPlus[0]-OxMin[0])*t);
+													y=((OyMin[0]+Rarc*sin(AxisCut[0]))+(OyPlus[0]-OyMin[0])*t);label=1;}
+	border GammaArchPlus0(t=0,1){x=OxPlus[0]+Rarc*cos(AxisCut[0]+t1*t); y=OyPlus[0]+Rarc*sin(AxisCut[0]+t1*t); label=1;}
+	border GammaArch0(t=0,1){x=cos(AxisCut[0]+t1+2*(pi-t1)*t);
+													 y=sin(AxisCut[0]+t1+2*(pi-t1)*t);label=1;}
+
+
+	Th=buildmesh(GammaArchMin0(obd*Rarc*t1)
+							+GammaCut0(obd*LenCut)
+							+GammaArchPlus0(obd*Rarc*t1)
+							+GammaArch0(obd*2*(pi-t1))
+							);
+
+  // Smooth the outer boundary pieces
+  real[int,int] b1(3,1); real l1=extractborder(Th,1,b1); // l1 is the permiter of b1
+  gslspline splineX(gslinterpakima, b1(2, :), b1(0, :)); 	// x(s) akima spline
+  gslspline splineY(gslinterpakima, b1(2, :), b1(1, :)); 	// y(s) akima spline
+  border Outer(t=0,l1){x=splineX(t);y=splineY(t);label=1;}
+  int nO = round(obd*l1);
+
+  // Transform the dense mesh & into an adaptive one
+  fespace Dini(Th, P1);	// Distance function to define the contour region of the mesh
+
+  varf vong(B, d)= on(1,B=1);
+  real[int] ong=vong(0,Dini);
+  Dini B =1, d;
+  B[] = ong ? 0 : B[];
+  distance(Th,B,d[]);
+
+  // Get the new inner boundary vertices (ISO is the contour d==nu)
+  real[int,int] ISO(3,1); int nc=isoline(Th,d,iso=ThickOutMesh,close=1,ISO,smoothing=ThickOutMesh/2.,ratio=1.e-0);
+  real l2=ISO(2,ISO.m-1); // l2 is the perimeter of ISO
+  border Inner(t=0,1){ P=Curve(ISO,t);label=0;}
+  int nI = round(ibd*l2); 						// new number of elements (prescribed density ibd)
+
+  // C. BUILD NEW MESH
+  Th=buildmesh(Outer(nO)+Inner(nI),fixedborder=1);
+  Th=change(Th,rmInternalEdges=1);
+  Thb=emptymesh(Th);
+
+
+/*// Perturbations of the circular domain with 2 cuts, smoth with 1/f = 0
+mesh Th,Thb;
+	real Rarc = fracRarc;
+  real t1 = acos((cos(cut/2.)-Rarc)/(1-Rarc));
+
+	real[int] AxisCut = [pi/2.,3.*pi/2.];
+
+	real[int] OxPlus = [(1-Rarc)*cos(AxisCut[0]+t1),(1-Rarc)*cos(AxisCut[1]+t1)];
+	real[int] OyPlus = [(1-Rarc)*sin(AxisCut[0]+t1),(1-Rarc)*sin(AxisCut[1]+t1)];
+	real[int] OxMin = [(1-Rarc)*cos(AxisCut[0]-t1),(1-Rarc)*cos(AxisCut[1]-t1)];
+	real[int] OyMin = [(1-Rarc)*sin(AxisCut[0]-t1),(1-Rarc)*sin(AxisCut[1]-t1)];
+	real LenCut = sqrt((OxPlus[0]-OxMin[0])*(OxPlus[0]-OxMin[0]) + (OyPlus[0]-OyMin[0])*(OyPlus[0]-OyMin[0]));
+
+  border GammaArchMin0(t=0,1){x=OxMin[0]+Rarc*cos(AxisCut[0]-t1*(1-t)); y=OyMin[0]+Rarc*sin(AxisCut[0]-t1*(1-t)); label=1;}
+	border GammaCut0(t=0,1){x=((OxMin[0]+Rarc*cos(AxisCut[0]))+(OxPlus[0]-OxMin[0])*t);
+													y=((OyMin[0]+Rarc*sin(AxisCut[0]))+(OyPlus[0]-OyMin[0])*t);label=1;}
+	border GammaArchPlus0(t=0,1){x=OxPlus[0]+Rarc*cos(AxisCut[0]+t1*t); y=OyPlus[0]+Rarc*sin(AxisCut[0]+t1*t); label=1;}
+	border GammaArch0(t=0,1){x=cos(AxisCut[0]+t1+(AxisCut[1]-2*t1-AxisCut[0])*t);
+													 y=sin(AxisCut[0]+t1+(AxisCut[1]-2*t1-AxisCut[0])*t);label=1;}
+
+
+  border GammaArchMin1(t=0,1){x=OxMin[1]+Rarc*cos(AxisCut[1]-t1*(1-t)); y=OyMin[1]+Rarc*sin(AxisCut[1]-t1*(1-t)); label=1;}
+	border GammaCut1(t=0,1){x=((OxMin[1]+Rarc*cos(AxisCut[1]))+(OxPlus[1]-OxMin[1])*t);
+													y=((OyMin[1]+Rarc*sin(AxisCut[1]))+(OyPlus[1]-OyMin[1])*t);label=1;}
+	border GammaArchPlus1(t=0,1){x=OxPlus[1]+Rarc*cos(AxisCut[1]+t1*t); y=OyPlus[1]+Rarc*sin(AxisCut[1]+t1*t); label=1;}
+	border GammaArch1(t=0,1){x=cos(AxisCut[1]+t1+(AxisCut[0]+2*pi-2*t1-AxisCut[1])*t);
+													 y=sin(AxisCut[1]+t1+(AxisCut[0]+2*pi-2*t1-AxisCut[1])*t);label=1;}
+
+	Th=buildmesh(GammaArchMin0(obd*Rarc*t1)
+							+GammaCut0(obd*LenCut)
+							+GammaArchPlus0(obd*Rarc*t1)
+							+GammaArch0(obd*(AxisCut[1]-AxisCut[0]-2*t1))
+
+							+GammaArchMin1(obd*Rarc*t1)
+							+GammaCut1(obd*LenCut)
+							+GammaArchPlus1(obd*Rarc*t1)
+							+GammaArch1(obd*(AxisCut[0]+2*pi-AxisCut[1]-2*t1))
+							);
+
+	// Transform a dense mesh into an adaptive one
+	fespace Dini(Th, P1);	// Distance function to define the contour region of the mesh
+
+	varf vong(B, d)= on(1,B=1);
+	real[int] ong=vong(0,Dini);
+	Dini B =1, d;
+	B[] = ong ? 0 : B[];
+	distance(Th,B,d[]);
+	// Get the new inner boundary vertices (ISO is the contaur d==nu)
+	real[int,int] ISO(3,1); int nc=isoline(Th,d,iso=ThickOutMesh,close=1,ISO,smoothing=ThickOutMesh/2.,ratio=1.e-0);
+	real l2=ISO(2,ISO.m-1); // l2 is the perimeter of ISO
+	border Inner(t=0,1){ P=Curve(ISO,t);label=2;}
+	int nI = round(ibd*l2); 						// new number of elements (prescribed density ibd)
+	// C. BUILD NEW MESH
+	Th=buildmesh(GammaArchMin0(obd*Rarc*t1)
+							+GammaCut0(obd*LenCut)
+							+GammaArchPlus0(obd*Rarc*t1)
+							+GammaArch0(obd*(AxisCut[1]-AxisCut[0]-2*t1))
+
+							+GammaArchMin1(obd*Rarc*t1)
+							+GammaCut1(obd*LenCut)
+							+GammaArchPlus1(obd*Rarc*t1)
+							+GammaArch1(obd*(AxisCut[0]+2*pi-AxisCut[1]-2*t1))
+							+Inner(nI),fixedborder=1
+							);
+	Th=change(Th,rmInternalEdges=1);
+	Thb=emptymesh(T);
+*/
+
+/*// Perturbations of the circular domain with 3 cuts, smoth with 1/f = 0
+mesh Th,Thb;
+	real Rarc = fracRarc;
+  real t1 = acos((cos(cut/2.)-Rarc)/(1-Rarc));
+
+	real[int] OxPlus = [(1-Rarc)*cos(AxisCut[0]+t1),(1-Rarc)*cos(AxisCut[1]+t1),(1-Rarc)*cos(AxisCut[2]+t1)];
+	real[int] OyPlus = [(1-Rarc)*sin(AxisCut[0]+t1),(1-Rarc)*sin(AxisCut[1]+t1),(1-Rarc)*sin(AxisCut[2]+t1)];
+	real[int] OxMin = [(1-Rarc)*cos(AxisCut[0]-t1),(1-Rarc)*cos(AxisCut[1]-t1),(1-Rarc)*cos(AxisCut[2]-t1)];
+	real[int] OyMin = [(1-Rarc)*sin(AxisCut[0]-t1),(1-Rarc)*sin(AxisCut[1]-t1),(1-Rarc)*sin(AxisCut[2]-t1)];
+	real LenCut = sqrt((OxPlus[0]-OxMin[0])*(OxPlus[0]-OxMin[0]) + (OyPlus[0]-OyMin[0])*(OyPlus[0]-OyMin[0]));
+
+  border GammaArchMin0(t=0,1){x=OxMin[0]+Rarc*cos(AxisCut[0]-t1*(1-t)); y=OyMin[0]+Rarc*sin(AxisCut[0]-t1*(1-t)); label=1;}
+	border GammaCut0(t=0,1){x=((OxMin[0]+Rarc*cos(AxisCut[0]))+(OxPlus[0]-OxMin[0])*t);
+													y=((OyMin[0]+Rarc*sin(AxisCut[0]))+(OyPlus[0]-OyMin[0])*t);label=1;}
+	border GammaArchPlus0(t=0,1){x=OxPlus[0]+Rarc*cos(AxisCut[0]+t1*t); y=OyPlus[0]+Rarc*sin(AxisCut[0]+t1*t); label=1;}
+	border GammaArch0(t=0,1){x=cos(AxisCut[0]+t1+(AxisCut[1]-2*t1-AxisCut[0])*t);
+													 y=sin(AxisCut[0]+t1+(AxisCut[1]-2*t1-AxisCut[0])*t);label=1;}
+
+  border GammaArchMin1(t=0,1){x=OxMin[1]+Rarc*cos(AxisCut[1]-t1*(1-t)); y=OyMin[1]+Rarc*sin(AxisCut[1]-t1*(1-t)); label=1;}
+	border GammaCut1(t=0,1){x=((OxMin[1]+Rarc*cos(AxisCut[1]))+(OxPlus[1]-OxMin[1])*t);
+													y=((OyMin[1]+Rarc*sin(AxisCut[1]))+(OyPlus[1]-OyMin[1])*t);label=1;}
+	border GammaArchPlus1(t=0,1){x=OxPlus[1]+Rarc*cos(AxisCut[1]+t1*t); y=OyPlus[1]+Rarc*sin(AxisCut[1]+t1*t); label=1;}
+	border GammaArch1(t=0,1){x=cos(AxisCut[1]+t1+(AxisCut[2]-2*t1-AxisCut[1])*t);
+													 y=sin(AxisCut[1]+t1+(AxisCut[2]-2*t1-AxisCut[1])*t);label=1;}
+
+	border GammaArchMin2(t=0,1){x=OxMin[2]+Rarc*cos(AxisCut[2]-t1*(1-t)); y=OyMin[2]+Rarc*sin(AxisCut[2]-t1*(1-t)); label=1;}
+	border GammaCut2(t=0,1){x=((OxMin[2]+Rarc*cos(AxisCut[2]))+(OxPlus[2]-OxMin[2])*t);
+													y=((OyMin[2]+Rarc*sin(AxisCut[2]))+(OyPlus[2]-OyMin[2])*t);label=1;}
+	border GammaArchPlus2(t=0,1){x=OxPlus[2]+Rarc*cos(AxisCut[2]+t1*t); y=OyPlus[2]+Rarc*sin(AxisCut[2]+t1*t); label=1;}
+	border GammaArch2(t=0,1){x=cos(AxisCut[2]+t1+(AxisCut[0]+2*pi-2*t1-AxisCut[2])*t);
+													 y=sin(AxisCut[2]+t1+(AxisCut[0]+2*pi-2*t1-AxisCut[2])*t);label=1;}
+
+
+	Th=buildmesh(GammaArchMin0(obd*Rarc*t1)
+							+GammaCut0(obd*LenCut)
+							+GammaArchPlus0(obd*Rarc*t1)
+							+GammaArch0(obd*(AxisCut[1]-AxisCut[0]-2*t1))
+
+							+GammaArchMin1(obd*Rarc*t1)
+							+GammaCut1(obd*LenCut)
+							+GammaArchPlus1(obd*Rarc*t1)
+							+GammaArch1(obd*(AxisCut[2]-AxisCut[1]-2*t1))
+
+							+GammaArchMin2(obd*Rarc*t1)
+							+GammaCut2(obd*LenCut)
+							+GammaArchPlus2(obd*Rarc*t1)
+							+GammaArch2(obd*(AxisCut[0]+2*pi-AxisCut[2]-2*t1))
+							);
+
+	// Transform a dense mesh into an adaptive one
+	fespace Dini(Th, P1);	// Distance function to define the contour region of the mesh
+
+	varf vong(B, d)= on(1,B=1);
+	real[int] ong=vong(0,Dini);
+	Dini B =1, d;
+	B[] = ong ? 0 : B[];
+	distance(Th,B,d[]);
+	// Get the new inner boundary vertices (ISO is the contaur d==nu)
+	real[int,int] ISO(3,1); int nc=isoline(Th,d,iso=ThickOutMesh,close=1,ISO,smoothing=ThickOutMesh/2.,ratio=1.e-0);
+	real l2=ISO(2,ISO.m-1); // l2 is the perimeter of ISO
+	border Inner(t=0,1){ P=Curve(ISO,t);label=2;}
+	int nI = round(ibd*l2); 						// new number of elements (prescribed density ibd)
+	// C. BUILD NEW MESH
+	Th=buildmesh(GammaArchMin0(obd*Rarc*t1)
+							+GammaCut0(obd*LenCut)
+							+GammaArchPlus0(obd*Rarc*t1)
+							+GammaArch0(obd*(AxisCut[1]-AxisCut[0]-2*t1))
+
+							+GammaArchMin1(obd*Rarc*t1)
+							+GammaCut1(obd*LenCut)
+							+GammaArchPlus1(obd*Rarc*t1)
+							+GammaArch1(obd*(AxisCut[2]-AxisCut[1]-2*t1))
+
+							+GammaArchMin2(obd*Rarc*t1)
+							+GammaCut2(obd*LenCut)
+							+GammaArchPlus2(obd*Rarc*t1)
+							+GammaArch2(obd*(AxisCut[0]+2*pi-AxisCut[2]-2*t1))
+
+							+Inner(nI),fixedborder=1
+							);
+	Th=change(Th,rmInternalEdges=1);
+	Thb=emptymesh(T);
+*/
+
+/*// Ellipse
+mesh Th,Thb;
+ real foci = 1;    // Foci distance, focus are located at (x,y)=(+-c,0)
+
+ border Gamma(t=0,2*pi){x=sqrt(1+pow(foci,2))*cos(t);
+                        y=sin(t); label=1;}
+ Th=buildmesh(Gamma(obd*2*pi));
+
+ // Transform a dense mesh into an adaptive one
+ fespace Dini(Th, P1);	// Distance function to define the contour region of the mesh
+
+ varf vong(B, d)= on(1,B=1);
+ real[int] ong=vong(0,Dini);
+ Dini B =1, d;
+ B[] = ong ? 0 : B[];
+ distance(Th,B,d[]);
+ // Get the new inner boundary vertices (ISO is the contaur d==nu)
+ real[int,int] ISO(3,1); int nc=isoline(Th,d,iso=ThickOutMesh,close=1,ISO,smoothing=ThickOutMesh/2.,ratio=1.e-0);
+ real l2=ISO(2,ISO.m-1); // l2 is the perimeter of ISO
+ border Inner(t=0,1){ P=Curve(ISO,t);label=0;}
+ int nI = round(ibd*l2); 						// new number of elements (prescribed density ibd)
+ // C. BUILD NEW MESH
+ Th=buildmesh(Gamma(obd*2*pi)+Inner(nI),fixedborder=1);
+ Th=change(Th,rmInternalEdges=true);
+ Thb=emptymesh(Th);*/
+
+/*// Random perturbations of the circle
+func real randn()
+{
+ real U1, U2;
+ U1 = randreal3();
+ U2 = randreal3();
+ return sqrt(-2*log(U1))*cos(2*pi*U2);
+}
+
+cout << randn() << endl;
+
+mesh Th,Thb;
+
+ border Gamma(t=0,2*pi){x=cos(t);
+                        y=sin(t); label=1;}
+ Th=buildmesh(Gamma(10));
+
+ // A.1. GET OUTER BOUNDARY VERTICES (b1)
+ real[int,int] b1(3,1); real l1=extractborder(Th,1,b1); // l1 is the permiter of b1
+// A.2(c). SPLINE INTERPOLATION OF b1 (for remeshing outer boundary smoothly)
+ gslspline splineX(gslinterpakima, b1(2, :), b1(0, :)); 	// x(s) akima spline
+ gslspline splineY(gslinterpakima, b1(2, :), b1(1, :)); 	// y(s) akima spline
+ border Outer(t=0,l1){x=splineX(t);y=splineY(t);label=1;}
+ int nO = round(obd*l1);
+
+ // Transform a dense mesh into an adaptive one
+ fespace Dini(Th, P1);	// Distance function to define the contour region of the mesh
+
+ varf vong(B, d)= on(1,B=1);
+ real[int] ong=vong(0,Dini);
+ Dini B =1, d;
+ B[] = ong ? 0 : B[];
+ distance(Th,B,d[]);
+ // Get the new inner boundary vertices (ISO is the contaur d==nu)
+ real[int,int] ISO(3,1); int nc=isoline(Th,d,iso=ThickOutMesh,close=1,ISO,smoothing=ThickOutMesh/2.,ratio=1.e-0);
+ real l2=ISO(2,ISO.m-1); // l2 is the perimeter of ISO
+ border Inner(t=0,1){ P=Curve(ISO,t);label=0;}
+ int nI = round(ibd*l2); 						// new number of elements (prescribed density ibd)
+ // C. BUILD NEW MESH
+ Th=buildmesh(Gamma(obd*2*pi)+Inner(nI),fixedborder=1);
+ Th=change(Th,rmInternalEdges=true);
+ Thb=emptymesh(Th);*/
+
+
+real Area0=int2d(Th)(1.); // Inital Area of the Fluid Domain
+real Xcm0=int2d(Th)(x)/Area0; //Initial x_cm
+real Ycm0=int2d(Th)(y)/Area0; //Initial y_cm
+
+
+plot(Th,value = true, fill = false, nbiso=64, wait=true, cmm = "adaptive mesh;  A0="+Area0+",  (xcm0,yxm0)=("+Xcm0+","+Ycm0+")");
+
+// Save mesh
+savemesh(Th,"simple_Th.msh");
