@@ -4,6 +4,8 @@ load "distance"
 load "isoline"
 load "gsl"
 
+// Testing
+
 //include <iostream>;
 // include "/home/joan/Documents/Tesi_doct/Spontaneous_tissue_motility/Simul_runs/large_clusters_MDCK/parameters_MDCK_MCF10a_Blanch.edp";
 include "/home/joan/Documents/Repositoris/Spontaneous_tissue_motility/parameters_sets/parameters_MDA-Mb-231_Alert.edp";
