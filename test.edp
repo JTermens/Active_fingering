@@ -1,0 +1,63 @@
+// PACKAGES FOR ADVANCED REMESHING SCHEME
+load "Curvature"
+load "distance"
+load "isoline"
+load "gsl"
+
+//include <iostream>;
+verbosity=0;
+
+// NUMERICAL PARAMS
+real obd=50.; 	// OUTER BOUNDARY MESH DENSITY
+real ibd=15;  	// INNER BOUNDARY MESH DENSITY
+real dt=0.05;   // TIME STEP
+int Ni=201;  // NUMBER OF ITERATIONS
+
+
+
+mesh T = square(1*obd, 1*obd);
+mesh Tb=emptymesh(T);
+
+real Volume0=int2d(T)(1.); // Inital Volume of the Fluid Domain
+real Volume=Volume0;
+real Xcm0=int2d(T)(x)/Volume; //Initial x_cm
+real Ycm0=int2d(T)(y)/Volume; //Initial y_cm
+real XcmP=Xcm0;
+real YcmP=Ycm0;
+real Xcm=Xcm0;
+real Ycm=Ycm0;
+
+plot(T,value = true, fill = false, nbiso=64, wait=true, cmm = "adaptive mesh;  Vol0="+Volume0+",  (xcm0,yxm0)=("+Xcm0+","+Ycm0+")");
+
+//FEM SPACES
+fespace Pol(T, [P2, P2]); 		// FOR POLARITY VECTOR
+fespace Pola(T, P2 ); 			// FOR |p| (not essential, just visualization)
+fespace Vel(T, [P1b, P1b]); 	// FOR VELOCITY VECTOR
+fespace Dh(T, P1); 				// FOR DISTANCE FUNCTION (REMESHING SCHEME) AND DATA EXPORTS
+fespace Tauh(Tb,[P0edge,P0edge]);		// FOR TANGENTS DEFINED IN CURRENT CONFIGURATION
+fespace dSh(Tb,P0edge);					// FOR SURFACE ELEMENT IN CURRENT CONFIGURATION
+
+
+//MACROS
+macro pD [pD1, pD2] 	// P2 EXTENSION DIRICHLET DATA
+macro p [p1, p2] 		// POLARITY VECTOR FIELD
+macro q [q1, q2] 		// POLARITY TEST FUNCTIONS
+macro V [V1, V2] 		// VELOCITY FIELD
+macro U [U1, U2] 		// VELOCITY TEST FUNCTIONS
+macro Vc [Vc1, Vc2] 	// EXPLICIT VELOCITY IN ITERATIVE NEWTON METHOD
+macro grad(u) [dx(u),dy(u)]							// GRADIENT OF SCALAR
+macro Grad(u1,u2) [dx(u1),dy(u1),dx(u2),dy(u2)] 	// GRADIENT OF VECTOR
+macro GradT(u1,u2) [dx(u1),dx(u2),dy(u1),dy(u2)] 	// GRAD VEC TRANSPOSE
+macro pp(p1,p2) [p1*p1,p1*p2,p2*p1,p2*p2] 			// ACTIVE STRESS TENSOR
+macro tau [-N.y,N.x] 									// TANGENT IN CURRENT CONFIGURATION
+macro dtau(V)	[grad(V#1)'*tau,grad(V#2)'*tau]			// DIFFERENCE IN TANGENT
+macro Tau [Tau1,Tau2]									// TANGENT IN DEFORMED CONFIGURATION
+macro Nc [Tau2,-Tau1]									// NORMAL IN DEFORMED CONFIGURATION
+macro dTau [dTau1,dTau2]								// VECTOR TEST FUNCTION ON BOUNDARY ELEMENTS (to compute Tau)
+
+
+// P2 EXTENSION OF POLARITY DIRICHLET DATA
+varf bndDirichlet(p, q) = on(1, p1 = N.x) + on(1, p2 = N.y);
+Pol pD=[0,0];
+pD1[] = bndDirichlet(0, Pol, tgv = 1.0);
+plot(pD, value = true, fill = true, nbiso=64, wait=true, cmm = "pD");
