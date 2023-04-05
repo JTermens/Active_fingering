@@ -3,7 +3,7 @@
 
 verbosity=0;
 
-string rootDir = "/home/joan/Documents/Tesi_doct/Projects/Active_fingering/Simul_runs/tests";
+string rootDir = "/home/...";
 string[int] simulNames = ["test_MDCK_stripe"];
 
 
