@@ -5,7 +5,7 @@ load "isoline"
 load "gsl"
 
 //include <iostream>;
-include "/home/joan/Documents/Tesi_doct/Projects/Active_fingering/codes/param_sets/parameters_MDCK_MCF10a_Blanch.edp";
+include "param_sets/parameters_MDCK_MCF10a_Blanch.edp";
 
 string simulName;
 string simulHomeDir;
