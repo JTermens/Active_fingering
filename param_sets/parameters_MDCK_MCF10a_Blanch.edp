@@ -1,0 +1,64 @@
+// Parameter file for MDCK/MCF10a cells with stripe/semiplane
+// Estimations done by Carles Blanch at Blanch et al, Soft Matter 2017
+
+verbosity=0;
+
+string rootDir = "/home/joan/Documents/Tesi_doct/Projects/Active_fingering/Simul_runs/tests";
+string[int] simulNames = ["test_MDCK_stripe"];
+
+
+// Physiscal Parameters
+real h = 5;			// Monolayer heigth, [μm]
+real Lc = 50;			// Nematic length, sqrt(K/a), [μm]
+real eta = 6.25e3;		// Monolayer viscosity, [kPa·s], fitted so that lambda = 250 μm
+real xi = 0.1;			// Friction coefficient, [kPa·s/μm²]
+real zi = 0.01;			// Traction coefficient, [kPa/μm],
+real zeta = /*-1*/-2;		// -Contractility coefficient, [kPa], low estimation
+real tscale = eta/(zi*Lc);   // Timescale corresponding to the advance of a flat front, [s]
+// If surface tension
+real gamma = 5.;    // Surface tension, [mN/m]=[kPa·μm]
+
+// Numerical Parameters
+real obd = 60.;		// Outer boundary mesh density
+real ibd = 15.;		// Inner boundary mesh density
+real dt = 0.01;			// Adim. time step
+int NiterTime = 500;		// Number of iterations
+int nSimul = 1;			// Number of simulations
+real rateMaxArea = 4;   // Stop the simulation when Area = rateMaxArea * (Initial Area)
+// If surface tension
+real maxNewtonResidu = 1.e-6;    // Cutoff residue for the Newton method
+int maxNewtonIter = 10;         // Max num, of iterations for the Newton method
+
+// Save parameters
+bool bsave = 1;			// To save or not
+int dsave = 5;			// Save frame gap
+
+// Domain parameters
+real L0 = 200;
+real[int] ampsLeft = [0.01];
+int[int] nModesLeft = [8];
+
+real[int] ampsRight = [0.01];
+int[int] nModesRight = [8];
+
+if(bsave){
+  for (int i=0; i<nSimul; i++){
+    // the results folder
+    string simulHomeDir = rootDir+"/"+simulNames[i];
+    string fileNameParams = "/params.csv";
+    
+    exec("mkdir "+simulHomeDir);	// Make a home directory for the simulation
+	  exec("mkdir "+simulHomeDir+"/msh");	// Make and save the meshes in a separeted directory
+	  exec("mkdir "+simulHomeDir+"/local_sol");	// Make and save the local solutions in a separeted directory
+
+    { ofstream fileParameters (simulHomeDir+fileNameParams);
+
+      fileParameters.fixed;
+      fileParameters << "L0,h,Lc,eta,xi,zi,zeta,tscale,ampLeft"<< ",ampRight" << ",nModeLeft" << ",nModeRight" << ",dt,dsave" /*<< ",gamma"*/ <<  endl;
+      // μ = \u03BC in unicode
+      fileParameters << L0  << "," << h  << "," << Lc    << "," << eta << ","
+                     << xi     << "," << zi << "," << zeta  << "," << tscale << ","
+                     << ampsLeft[i] << "," << nModesLeft[i] << "," << ampsRight[i] << "," << nModesRight[i] << "," << dt << "," << dsave /*<< "," << gamma*/ << endl;//
+    }
+  }
+}

@@ -1,0 +1,136 @@
+// PACKAGES FOR ADVANCED REMESHING SCHEME
+load "Curvature"
+load "distance"
+load "isoline"
+load "gsl"
+
+//include <iostream>;
+
+verbosity=1;
+string SimulName = "Test BC";
+
+real Lx = 6*pi;
+real Ly = 2*pi;
+real Lc = 0.2;
+real bLayerThickness = .2*Lx;	// Thickness of the boundary layer
+int obd = 4;							// Outer boundary node density
+int ibd = 2;							// Inner boundary node density
+
+real finalAmp = .1;
+int NiterTime = 200;
+real dt = finalAmp/NiterTime;
+
+// Mesh identifiers
+int labelBottom = 1;
+int labelRight = 2;
+int labelTop = 3;
+int labelLeft = 4;
+
+func perio=[[1,x],[3,x]]; // Periodicity
+
+func mesh symmetricSemiplane(int obd, int ibd, real bLayerThickness, real Lx){
+
+	real Ly = 2*pi;
+	int[int] labelChange = [labelTop,labelBottom];
+
+	mesh Th,ThHalfTop,ThHalfBottom,Thb; // Final mesh (Th) + auxyliary meshes
+
+	// Defien the borders for both the bulk and the layer meshes
+	border Bottom(t=0, 1){x=-Lx+(Lx-bLayerThickness)*t; y=0; label=labelBottom;}
+	border BottomLayer(t=0, 1){x=bLayerThickness*(t-1); y=0; label=labelBottom;}
+
+	border Top(t=0, 1){x=-bLayerThickness-(Lx-bLayerThickness)*t; y=.5*Ly; label=labelTop;}
+	border TopLayer(t=0, 1){x=-bLayerThickness*t; y=.5*Ly; label=labelTop;}
+
+	border Left(t=0,1){x=-Lx; y=.5*Ly*(1-t); label=labelLeft;}
+
+	// change for a perturbed front, if needed. Mantain extreme points at x=0
+	border Right(t=0,1){x=0; y=.5*Ly*t; label=labelRight;}
+	border Inner(t=0,1){x=-bLayerThickness; y=.5*Ly*t;}
+
+
+	ThHalfTop = buildmesh(
+		Bottom(ibd*(Lx-bLayerThickness))
+		+ BottomLayer(obd*bLayerThickness)
+		+ Right(obd*.5*Ly)
+		+ Inner(obd*.5*Ly)
+		+ TopLayer(obd*bLayerThickness)
+		+ Top(ibd*(Lx-bLayerThickness))
+		+ Left(ibd*.5*Ly)
+	);
+
+	ThHalfBottom = movemesh(ThHalfTop,[x,-y]);
+	ThHalfBottom = change(ThHalfBottom, label=labelChange);
+
+	Th = ThHalfTop + ThHalfBottom;
+	Th = change(Th,rmInternalEdges=1);
+
+	return Th;
+}
+
+func mesh symmetricStripe(int obd, int ibd, real bLayerThickness, real Lx){
+
+	real Ly = 1;
+	int[int] labelChange = [labelTop,labelBottom];
+
+	mesh Th,ThHalfTop,ThHalfBottom,Thb; // Final mesh (Th) + auxyliary meshes
+
+	// Defien the borders for both the bulk and the layer meshes
+	border Bottom(t=0, 1){x=-(Lx-bLayerThickness)+2*(Lx-bLayerThickness)*t; y=0; label=labelBottom;}
+	border BottomLayerRight(t=0, 1){x=(Lx-bLayerThickness)+bLayerThickness*t; y=0; label=labelBottom;}
+	border BottomLayerLeft(t=0, 1){x=-Lx+bLayerThickness*t; y=0; label=labelBottom;}
+
+	border Top(t=0, 1){x=(Lx-bLayerThickness)-2*(Lx-bLayerThickness)*t; y=.5*Ly; label=labelTop;}
+	border TopLayerRight(t=0, 1){x=Lx-bLayerThickness*t; y=.5*Ly; label=labelTop;}
+	border TopLayerLeft(t=0, 1){x=-(Lx-bLayerThickness)-bLayerThickness*t; y=.5*Ly; label=labelTop;}
+
+
+	// change for a perturbed front, if needed. Mantain extreme points at x=0
+	border Right(t=0,1){x=Lx; y=.5*Ly*t; label=labelRight;}
+	border InnerRight(t=0,1){x=Lx-bLayerThickness; y=.5*Ly*t;}
+
+	border Left(t=0,1){x=-Lx; y=.5*Ly*(1-t); label=labelLeft;}
+	border InnerLeft(t=0,1){x=-(Lx-bLayerThickness); y=.5*Ly*(1-t);}
+
+	ThHalfTop = buildmesh(
+		BottomLayerLeft(obd*bLayerThickness)
+		+ Bottom(ibd*2*(Lx-bLayerThickness))
+		+ BottomLayerRight(obd*bLayerThickness)
+		+ TopLayerLeft(obd*bLayerThickness)
+		+ Top(ibd*2*(Lx-bLayerThickness))
+		+ TopLayerRight(obd*bLayerThickness)
+		+ Right(obd*.5*Ly)
+		+ InnerRight(obd*.5*Ly)
+		+ Left(obd*.5*Ly)
+		+ InnerLeft(obd*.5*Ly)
+		);
+
+	ThHalfBottom = movemesh(ThHalfTop,[x,-y]);
+	ThHalfBottom = change(ThHalfBottom, label=labelChange);
+
+	Th = ThHalfTop + ThHalfBottom;
+	Th = change(Th,rmInternalEdges=1);
+
+	return Th;
+}
+
+// mesh Th = symmetricSemiplane(obd, ibd, bLayerThickness, Lx);
+// mesh Th = symmetricStripe(obd, ibd, bLayerThickness, 2);
+mesh Th=square(10, 10); //the initial mesh
+plot(Th, wait=true);
+
+Th = adaptmesh(Th, exp(x/Lc)*1./60., IsMetric=1, nbvx=10000);
+plot(Th, wait=true);
+
+Th = adaptmesh(Th, exp(x/Lc)*1./60., IsMetric=1, nbvx=10000); //More the one time du to
+Th = adaptmesh(Th, exp(x/Lc)*1./60., IsMetric=1, nbvx=10000); //Adaptation bound `maxsubdiv=`
+plot(Th, wait=true);
+
+
+fespace Dh(Th, P1);	 // For distance function
+varf vong(B, d)= on(labelRight,B=1);
+real[int] ong=vong(0,Dh);
+Dh B =1, d;
+B[] = ong ? 0 : B[];
+distance(Th,B,d[]);
+plot(d, wait=1);

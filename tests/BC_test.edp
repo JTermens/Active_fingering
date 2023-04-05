@@ -9,13 +9,13 @@ load "gsl"
 verbosity=1;
 string SimulName = "Test BC";
 
-real Lx = 6*pi;
-real bLayerThickness = .2*Lx;	// Thickness of the boundary layer
-int obd = 4;							// Outer boundary node density
-int ibd = 2;							// Inner boundary node density
+real Lx = 1;
+real bLayerThickness = .2;	// Thickness of the boundary layer
+int obd = 90;								// Outer boundary node density
+int ibd = 15;								// Inner boundary node density
 
-real finalAmp = .1;
-int NiterTime = 200;
+real finalAmp = .5;
+int NiterTime = 400;
 real dt = finalAmp/NiterTime;
 
 // Mesh identifiers
@@ -24,11 +24,11 @@ int labelRight = 2;
 int labelTop = 3;
 int labelLeft = 4;
 
-func perio=[[1,y],[3,y]]; // Periodicity
+func perio=[[1,x],[3,x]]; // Periodicity
 
 func mesh symmetricSemiplane(int obd, int ibd, real bLayerThickness, real Lx){
 
-	real Ly = 2*pi;
+	real Ly = 1;
 	int[int] labelChange = [labelTop,labelBottom];
 
 	mesh Th,ThHalfTop,ThHalfBottom,Thb; // Final mesh (Th) + auxyliary meshes
@@ -90,7 +90,7 @@ func mesh symmetricStripe(int obd, int ibd, real bLayerThickness, real Lx){
 	border Left(t=0,1){x=-Lx; y=.5*Ly*(1-t); label=labelLeft;}
 	border InnerLeft(t=0,1){x=-(Lx-bLayerThickness); y=.5*Ly*(1-t);}
 
-	ThHalfTop = buildmesh(
+		ThHalfTop = buildmesh(
 		BottomLayerLeft(obd*bLayerThickness)
 		+ Bottom(ibd*2*(Lx-bLayerThickness))
 		+ BottomLayerRight(obd*bLayerThickness)
@@ -112,9 +112,9 @@ func mesh symmetricStripe(int obd, int ibd, real bLayerThickness, real Lx){
 	return Th;
 }
 
-mesh Th = symmetricSemiplane(obd, ibd, bLayerThickness, Lx);
+// mesh Th = symmetricSemiplane(obd, ibd, bLayerThickness, Lx);
 // mesh Th = symmetricStripe(obd, ibd, bLayerThickness, 2);
-fespace Dh(Th, P1);	 // For distance function
+// fespace Dh(Th, P1);	 // For distance function, distance function does not work with periodic fespace
 
 func mesh periodicRemesh1side(mesh Th0,int obd, int ibd, real smoothCoef){
 
@@ -138,46 +138,48 @@ func mesh periodicRemesh1side(mesh Th0,int obd, int ibd, real smoothCoef){
 	border Bottom(t=0,1){ P=Curve(bBottom,bBottom(2,round(t*(bBottom.m-1)))/lBottom);label=labelBottom;}
 	border Left(t=0,1){ P=Curve(bLeft,bLeft(2,round(t*(bLeft.m-1)))/lLeft);label=labelLeft;}
 
-	// Distance function (d is the minimal distance to the boundary)
-  varf vong(B, d)= on(labelRight,B=1);
-  real[int] ong=vong(0,Dh);
-  Dh B =1, d;
-  B[] = ong ? 0 : B[];
-  distance(Th0,B,d[]);
-  //plot(d,Th0, wait=1);
+	// fespace Dh(Th0, P1);	 // Uncomment generates segmentation fault, don't know why could not be defined here
 
-  // Get the new inner boundary vertices (ISO is the contour d==bLayerThickness)
-  real[int,int] ISO(3,1); int nc=isoline(Th0,d,iso=bLayerThickness,close=0,ISO,beginend=be,smoothing=bLayerThickness*smoothCoef,ratio=1.e0);
+	// // Distance function (d is the minimal distance to the boundary)
+  // varf vong(B, d)= on(labelRight,B=1);
+  // real[int] ong=vong(0,Dh);
+  // Dh B =1, d;
+  // B[] = ong ? 0 : B[];
+  // distance(Th0,B,d[]);
+  // //plot(d,Th0, wait=1);
+
+  // // Get the new inner boundary vertices (ISO is the contour d==bLayerThickness)
+  // real[int,int] ISO(3,1); int nc=isoline(Th0,d,iso=bLayerThickness,close=0,ISO,beginend=be,smoothing=bLayerThickness*smoothCoef,ratio=1.e0);
   
-  int nInnerLines = be.n/2;
-  // cout << be << endl;
+  // int nInnerLines = be.n/2;
+  // // cout << be << endl;
 
-  int[int] nInner(nInnerLines); // numer of points per loop
-  int nCorrectLines = 0; // number of loops with more than minPoints
-  // find number of points and count > minPoints
-  for (int i=0;  i < nInnerLines; i++){
-    real lInner=ISO(2,be(i*2+1)-1);
-    nInner[i] = round(obd*lInner);
-    if(nInner[i] > minPoints){nCorrectLines++;}
-  }
+  // int[int] nInner(nInnerLines); // numer of points per loop
+  // int nCorrectLines = 0; // number of loops with more than minPoints
+  // // find number of points and count > minPoints
+  // for (int i=0;  i < nInnerLines; i++){
+  //   real lInner=ISO(2,be(i*2+1)-1);
+  //   nInner[i] = round(obd*lInner);
+  //   if(nInner[i] > minPoints){nCorrectLines++;}
+  // }
 	
-  // if the number of points is less than minPoints, filter the border for safety
-  int[int] nInnerFilter(nCorrectLines);
-  int[int] beFilter(2*nCorrectLines);
+  // // if the number of points is less than minPoints, filter the border for safety
+  // int[int] nInnerFilter(nCorrectLines);
+  // int[int] beFilter(2*nCorrectLines);
 
-  for (int i=0;  i < nInnerLines; i++){
-    if(nInner[i] > minPoints){
-      nInnerFilter[i] = nInner[i];
-      beFilter[2*i] = be[i*2];
-      beFilter[2*i+1] = be[i*2+1];
-    }
-  }
+  // for (int i=0;  i < nInnerLines; i++){
+  //   if(nInner[i] > minPoints){
+  //     nInnerFilter[i] = nInner[i];
+  //     beFilter[2*i] = be[i*2];
+  //     beFilter[2*i+1] = be[i*2+1];
+  //   }
+  // }
   
-  border Inner(t=0,1;i) {P=Curve(ISO,beFilter(i*2),beFilter(i*2+1)-1,t);} // Inner boundary multi-border
+  // border Inner(t=0,1;i) {P=Curve(ISO,beFilter(i*2),beFilter(i*2+1)-1,t);} // Inner boundary multi-border
 	// cout << nInner << endl;
 
 	// plot(buildmesh(Left(bLeft.m-1)+Bottom(bBottom.m-1)+Right(nRight)+Top(bTop.m-1)+Inner(nInnerFilter)), wait=1);
-	mesh Th = buildmesh(Left(bLeft.m-1)+Bottom(bBottom.m-1)+Right(nRight)+Top(bTop.m-1)+Inner(nInnerFilter));
+	mesh Th = buildmesh(Left(bLeft.m-1)+Bottom(bBottom.m-1)+Right(nRight)+Top(bTop.m-1)/*+Inner(nInnerFilter)*/);
 	Th = change(Th, rmInternalEdges=1);
 
   return Th;
@@ -209,54 +211,59 @@ func mesh periodicRemesh2side(mesh Th0,int obd, int ibd, real smoothCoef){
 	border Top(t=0,1){ P=Curve(bTop,bTop(2,round(t*(bTop.m-1)))/lTop);label=labelTop;}
 	border Bottom(t=0,1){ P=Curve(bBottom,bBottom(2,round(t*(bBottom.m-1)))/lBottom);label=labelBottom;}
 
-	// Distance function (d is the minimal distance to the boundary)
-  varf vong(B, d)= on(labelRight,B=1) + on(labelLeft,B=1);
-  real[int] ong=vong(0,Dh);
-  Dh B =1, d;
-  B[] = ong ? 0 : B[];
-  distance(Th0,B,d[]);
-  // plot(d,Th0, wait=1);
+	// fespace Dh(Th0, P1);	 // Uncomment generates segmentation fault, don't know why could not be defined here
+
+	// // Distance function (d is the minimal distance to the boundary)
+  // varf vong(B, d)= on(labelRight,B=1) + on(labelLeft,B=1);
+  // real[int] ong=vong(0,Dh);
+  // Dh B =1, d;
+  // B[] = ong ? 0 : B[];
+  // distance(Th0,B,d[]);
+  // // plot(d,Th0, wait=1);
 
 	
-  // Get the new inner boundary vertices (ISO is the contour d==bLayerThickness)
-  real[int,int] ISO(3,1); int nc=isoline(Th0,d,iso=bLayerThickness,close=0,ISO,beginend=be,smoothing=bLayerThickness*smoothCoef,ratio=1.e0);
+  // // Get the new inner boundary vertices (ISO is the contour d==bLayerThickness)
+  // real[int,int] ISO(3,1); int nc=isoline(Th0,d,iso=bLayerThickness,close=0,ISO,beginend=be,smoothing=bLayerThickness*smoothCoef,ratio=1.e0);
   
-  int nInnerLines = be.n/2;
-  // cout << be << endl;
+  // int nInnerLines = be.n/2;
+  // // cout << be << endl;
 
-  int[int] nInner(nInnerLines); // numer of points per loop
-  int nCorrectLines = 0; // number of loops with more than minPoints
-  // find number of points and count > minPoints
-  for (int i=0;  i < nInnerLines; i++){
-    real lInner=ISO(2,be(i*2+1)-1);
-    nInner[i] = round(obd*lInner);
-    if(nInner[i] > minPoints){nCorrectLines++;}
-  }
+  // int[int] nInner(nInnerLines); // numer of points per loop
+  // int nCorrectLines = 0; // number of loops with more than minPoints
+  // // find number of points and count > minPoints
+  // for (int i=0;  i < nInnerLines; i++){
+  //   real lInner=ISO(2,be(i*2+1)-1);
+  //   nInner[i] = round(obd*lInner);
+  //   if(nInner[i] > minPoints){nCorrectLines++;}
+  // }
 	
-  // if the number of points is less than minPoints, filter the border for safety
-  int[int] nInnerFilter(nCorrectLines);
-  int[int] beFilter(2*nCorrectLines);
+  // // if the number of points is less than minPoints, filter the border for safety
+  // int[int] nInnerFilter(nCorrectLines);
+  // int[int] beFilter(2*nCorrectLines);
 
-  for (int i=0;  i < nInnerLines; i++){
-    if(nInner[i] > minPoints){
-      nInnerFilter[i] = nInner[i];
-      beFilter[2*i] = be[i*2];
-      beFilter[2*i+1] = be[i*2+1];
-    }
-  }
+  // for (int i=0;  i < nInnerLines; i++){
+  //   if(nInner[i] > minPoints){
+  //     nInnerFilter[i] = nInner[i];
+  //     beFilter[2*i] = be[i*2];
+  //     beFilter[2*i+1] = be[i*2+1];
+  //   }
+  // }
   
-  border Inner(t=0,1;i) {P=Curve(ISO,beFilter(i*2),beFilter(i*2+1)-1,t);} // Inner boundary multi-border
-	// cout << nInner << endl;
+  // border Inner(t=0,1;i) {P=Curve(ISO,beFilter(i*2),beFilter(i*2+1)-1,t);} // Inner boundary multi-border
+	// // cout << nInner << endl;
 
 	// plot(Left(nLeft)+Bottom(bBottom.m-1)+Right(nRight)+Top(bTop.m-1)+Inner(nInnerFilter), wait=1);
-	mesh Th = buildmesh(Left(bLeft.m-1)+Bottom(bBottom.m-1)+Right(nRight)+Top(bTop.m-1)+Inner(nInnerFilter));
+	mesh Th = buildmesh(Left(nLeft)+Bottom(bBottom.m-1)+Right(nRight)+Top(bTop.m-1)/*+Inner(nInnerFilter)*/);
 	Th = change(Th, rmInternalEdges=1);
 	
   return Th;
 }
 
+mesh Th = symmetricSemiplane(obd, ibd, bLayerThickness, Lx);
+// mesh Th = symmetricStripe(obd, ibd, bLayerThickness, 2);
+
 plot(Th, wait=1, cmm="Initial Mesh Semiplane");
-Th = periodicRemesh1side(Th,obd,ibd,.5);
+//Th = periodicRemesh1side(Th,obd,ibd,.5);
 plot(Th, wait=1, cmm="1 Remesh Semiplane");
 
 // plot(Th, wait=1, cmm="Initial Mesh Stripe");
@@ -278,7 +285,7 @@ macro u [u1, u2]	// Velocity test function
 for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
 
   // Define a test velocity at the boundary (null in the bulk)
-  varf bndDirichlet(v, u) = on(labelRight, v1 = 0.001);
+  varf bndDirichlet(v, u) = on(labelRight, v1 = .1*sin(y*(2.*pi)))/*+on(labelLeft, v1 = -2*cos(y*(2.*pi)))*/;
   Vel v=[0,0];
   v1[] = bndDirichlet(0, Vel, tgv = 1.0);
 
@@ -290,6 +297,7 @@ for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
 
   // Remesh
   Th = periodicRemesh1side(Th,obd,ibd,.5);
+	//Th = periodicRemesh2side(Th,obd,ibd,.5);
   
-  plot(Th, wait=false, cmm="Time = "+(1+iterTime)*dt);
+  plot(Th,[v1,v2], wait=false, cmm="Time = "+(1+iterTime)*dt);
 }
