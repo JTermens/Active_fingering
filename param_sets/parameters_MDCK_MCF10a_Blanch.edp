@@ -9,11 +9,11 @@ string[int] simulNames = ["test_MDCK_stripe"];
 
 // Physiscal Parameters
 real h = 5;			// Monolayer heigth, [μm]
-real Lc = 50;			// Nematic length, sqrt(K/a), [μm]
-real eta = 6.25e3;		// Monolayer viscosity, [kPa·s], fitted so that lambda = 250 μm
-real xi = 0.1;			// Friction coefficient, [kPa·s/μm²]
-real zi = 0.01;			// Traction coefficient, [kPa/μm],
-real zeta = /*-1*/-2;		// -Contractility coefficient, [kPa], low estimation
+real Lc = 12.5;			// Nematic length, sqrt(K/a), [μm]
+real eta = 600;		// Monolayer viscosity, [kPa·s]
+real xi = 0.09;			// Friction coefficient, [kPa·s/μm²]
+real zi = 0.2;			// Traction coefficient, [kPa/μm],
+real zeta = -2.8;		// -Contractility coefficient, [kPa]
 real tscale = eta/(zi*Lc);   // Timescale corresponding to the advance of a flat front, [s]
 // If surface tension
 real gamma = 5.;    // Surface tension, [mN/m]=[kPa·μm]
@@ -22,24 +22,24 @@ real gamma = 5.;    // Surface tension, [mN/m]=[kPa·μm]
 real obd = 60.;		// Outer boundary mesh density
 real ibd = 15.;		// Inner boundary mesh density
 real dt = 0.01;			// Adim. time step
-int NiterTime = 500;		// Number of iterations
+int NiterTime = 1000;		// Number of iterations
 int nSimul = 1;			// Number of simulations
-real rateMaxArea = 4;   // Stop the simulation when Area = rateMaxArea * (Initial Area)
+real rateMaxArea = 40;   // Stop the simulation when Area = rateMaxArea * (Initial Area)
 // If surface tension
 real maxNewtonResidu = 1.e-6;    // Cutoff residue for the Newton method
 int maxNewtonIter = 10;         // Max num, of iterations for the Newton method
 
 // Save parameters
-bool bsave = 1;			// To save or not
+bool bsave = 0;			// To save or not
 int dsave = 5;			// Save frame gap
 
 // Domain parameters
-real L0 = 200;
+real L0 = 100;
 real[int] ampsLeft = [0.01];
-int[int] nModesLeft = [8];
+int[int] nModesLeft = [1];
 
 real[int] ampsRight = [0.01];
-int[int] nModesRight = [8];
+int[int] nModesRight = [1];
 
 if(bsave){
   for (int i=0; i<nSimul; i++){
@@ -62,3 +62,4 @@ if(bsave){
     }
   }
 }
+
