@@ -1,0 +1,15 @@
+int nb=100; // nb of elements of the boundary
+
+real[int] Cx(nb+1),Cy(nb+1);
+
+for(int i=0;i<=nb;i++){
+  real t=(1.*i)/nb;
+  Cx(i)=cos(2.*pi*t);Cy(i)=sin(2.*pi*t);
+}
+
+plot([Cx,Cy],wait=1); // The boundary defined as a vector
+
+// Build the mesh of border [Cx,Cy]
+border a(t=0,nb){x=Cx(t);y=Cy(t);label=1;};
+mesh Th=buildmesh(a(nb),fixeborder=1);
+plot(Th,wait=1);

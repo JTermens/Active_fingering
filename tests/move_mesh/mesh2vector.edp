@@ -1,0 +1,42 @@
+int numb = 10;
+
+border a(t=0,2.*pi){x=cos(t);y=sin(t);label=1;};
+mesh Th=buildmesh(a(numb));
+cout<<"Number of elements of the boundary="<<Th.nbe<<endl;
+plot(Th,wait=1,cmm="Initial mesh; "+Th.nbe+" elements at the bounday.");
+
+macro b(nb,k) Th.be(nb)[k] // border operator
+
+int[int,int] cb(Th.nv,2); // coborder operator
+int[int] nb(Th.nv); nb = 0;
+
+
+for(int i=0;i<Th.nbe;i++){
+  cb(b(i,0),nb(b(i,0))++)=i;
+  cb(b(i,1),nb(b(i,1))++)=i;
+}
+
+// Retreive the sorted list of points of the boundary
+int[int] boundaryDOF(Th.nbe+1);
+boundaryDOF(0)=b(0,0); boundaryDOF(1)=b(0,1); // first edge
+
+
+for(int i=1;i<Th.nbe;i++){
+  cout << boundaryDOF << endl;
+  int j=boundaryDOF(i);
+
+  int k0 = (b(cb(j,0),0)==j)?(b(cb(j,0),1)):(b(cb(j,0),0));
+  int k1 = (b(cb(j,1),0)==j)?(b(cb(j,1),1)):(b(cb(j,1),0));
+
+  boundaryDOF(i+1)=(k0==boundaryDOF(i-1))?k1:k0;
+}
+
+// Define the coordinates of the sorted boundary vertices
+real[int] Cx(Th.nbe+1),Cy(Th.nbe+1);
+
+for(int i=0;i<Th.nbe+1;i++){
+  Cx[i]=Th(boundaryDOF(i)).x; Cy[i]=Th(boundaryDOF(i)).y;
+}
+
+// plot the "vectorized" boundary
+plot([Cx,Cy],wait=1,cmm="vectorized boundary");
