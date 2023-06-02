@@ -263,7 +263,7 @@ mesh Th = symmetricSemiplane(obd, ibd, bLayerThickness, Lx);
 // mesh Th = symmetricStripe(obd, ibd, bLayerThickness, 2);
 
 plot(Th, wait=1, cmm="Initial Mesh Semiplane");
-//Th = periodicRemesh1side(Th,obd,ibd,.5);
+Th = periodicRemesh1side(Th,obd,ibd,.5);
 plot(Th, wait=1, cmm="1 Remesh Semiplane");
 
 // plot(Th, wait=1, cmm="Initial Mesh Stripe");

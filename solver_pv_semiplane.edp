@@ -6,6 +6,7 @@ load "gsl"
 
 //include <iostream>;
 include "param_sets/parameters_MDCK_MCF10a_Blanch.edp";
+//include "/home/joan/Documents/github/Active_fingering/param_sets/parameters_finger_splitting.edp";
 
 string simulName;
 string simulHomeDir;
@@ -153,8 +154,8 @@ for (int i=0; i<nSimul; i++){
     simulHomeDir = rootDir+"/"+simulName;
   }
 	
-  real Lx = sqrt(eta/xi)/L0;
-  real Ly = 1;
+  real Lx = 1;
+  real Ly = 2;
   real bLayerThickness = Lc/L0;	// Thickness of the boundary layer
 
   // Problem Parameters
@@ -165,8 +166,9 @@ for (int i=0; i<nSimul; i++){
 
   cout << "Simul: " << simulName << ", saving = " << bsave << "\nL0 = " << L0 /*<< ", Rc = " << Rc*/
   << ", lambda = " << sqrt(eta/xi) << ", Lc = " << Lc << ", La = " << abs(zeta)/zi << ", tscale = " << tscale << endl;
+  cout << "Lambda = " << (L0/Lc) << ", beta = " << ((xi*L0^2)/eta) << ", alpha = " << (zeta/(zi*L0)) <<  endl;
 
-  mesh Th = symmetricSemiplane(obd, ibd, bLayerThickness, Lx, Ly,ampsLeft[i],nModesLeft[i]);
+  mesh Th = symmetricSemiplane(obd, ibd, bLayerThickness, Lx, Ly,ampsRight[i],nModesRight[i]);
   Th = periodicRemesh1side(Th,obd,ibd,.5);
 
   real Area0=Th.measure; // Inital Area of the Fluid Domain
