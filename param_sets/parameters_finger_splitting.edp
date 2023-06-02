@@ -1,0 +1,65 @@
+// Parameter file for testing tip splitting cells with stripe/semiplane
+// Parameters from Trenado,Bonilla and Martínez-Calvo, Soft Matter 2021
+
+verbosity=0;
+
+string rootDir = "/home/joan/Documents/Tesi_doct/Projects/Active_fingering/Simul_runs";
+string[int] simulNames = ["test_tip_splitting"];
+
+
+// Physiscal Parameters
+real h = 5;			// Monolayer heigth, [μm]
+real Lc = 12.5;			// Nematic length, sqrt(K/a), [μm]
+real eta = 600;		// Monolayer viscosity, [kPa·s]
+real xi = 0.09;			// Friction coefficient, [kPa·s/μm²]
+real zi = 0.2;			// Traction coefficient, [kPa/μm],
+real zeta = -28;		// -Contractility coefficient, [kPa]
+// If surface tension
+real gamma = 5.;    // Surface tension, [mN/m]=[kPa·μm]
+
+// Numerical Parameters
+real obd = 60.;		// Outer boundary mesh density
+real ibd = 15.;		// Inner boundary mesh density
+real dt = 0.05;			// Adim. time step
+int NiterTime = 2*2700;		// Number of iterations
+int nSimul = 1;			// Number of simulations
+real rateMaxArea = 40;   // Stop the simulation when Area = rateMaxArea * (Initial Area)
+// If surface tension
+real maxNewtonResidu = 1.e-6;    // Cutoff residue for the Newton method
+int maxNewtonIter = 10;         // Max num, of iterations for the Newton method
+
+// Save parameters
+bool bsave = 1;			// To save or not
+int dsave = 20;			// Save frame gap
+
+// Domain parameters
+real L0 = 100;
+real tscale = eta/(zi*Lc);   // Timescale corresponding to the advance of a flat front, [s]
+real[int] ampsLeft = [0.01];
+int[int] nModesLeft = [1];
+
+real[int] ampsRight = [0.01];
+int[int] nModesRight = [2];
+
+if(bsave){
+  for (int i=0; i<nSimul; i++){
+    // the results folder
+    string simulHomeDir = rootDir+"/"+simulNames[i];
+    string fileNameParams = "/params.csv";
+    
+    exec("mkdir "+simulHomeDir);	// Make a home directory for the simulation
+	  exec("mkdir "+simulHomeDir+"/msh");	// Make and save the meshes in a separeted directory
+	  exec("mkdir "+simulHomeDir+"/local_sol");	// Make and save the local solutions in a separeted directory
+
+    { ofstream fileParameters (simulHomeDir+fileNameParams);
+
+      fileParameters.fixed;
+      fileParameters << "L0,h,Lc,eta,xi,zi,zeta,tscale,ampLeft"<< ",ampRight" << ",nModeLeft" << ",nModeRight" << ",dt,dsave" /*<< ",gamma"*/ <<  endl;
+      // μ = \u03BC in unicode
+      fileParameters << L0  << "," << h  << "," << Lc    << "," << eta << ","
+                     << xi     << "," << zi << "," << zeta  << "," << tscale << ","
+                     << ampsLeft[i] << "," << nModesLeft[i] << "," << ampsRight[i] << "," << nModesRight[i] << "," << dt << "," << dsave /*<< "," << gamma*/ << endl;//
+    }
+  }
+}
+
