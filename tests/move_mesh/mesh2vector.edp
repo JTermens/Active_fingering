@@ -1,3 +1,5 @@
+load "Curvature"
+
 int numb = 10;
 
 border a(t=0,2.*pi){x=cos(t);y=sin(t);label=1;};
@@ -10,7 +12,6 @@ macro b(nb,k) Th.be(nb)[k] // border operator
 int[int,int] cb(Th.nv,2); // coborder operator
 int[int] nb(Th.nv); nb = 0;
 
-
 for(int i=0;i<Th.nbe;i++){
   cb(b(i,0),nb(b(i,0))++)=i;
   cb(b(i,1),nb(b(i,1))++)=i;
@@ -22,7 +23,6 @@ boundaryDOF(0)=b(0,0); boundaryDOF(1)=b(0,1); // first edge
 
 
 for(int i=1;i<Th.nbe;i++){
-  cout << boundaryDOF << endl;
   int j=boundaryDOF(i);
 
   int k0 = (b(cb(j,0),0)==j)?(b(cb(j,0),1)):(b(cb(j,0),0));
@@ -37,6 +37,34 @@ real[int] Cx(Th.nbe+1),Cy(Th.nbe+1);
 for(int i=0;i<Th.nbe+1;i++){
   Cx[i]=Th(boundaryDOF(i)).x; Cy[i]=Th(boundaryDOF(i)).y;
 }
+
+for(int i=0;i<Th.nbe+1;i++){
+  cout << "(" << Cx[i] << ", " << Cy[i] << "); "/* << bOut(:,i)*/ << endl;
+}
+
+cout << " " << endl;
+
+int NbBoundaryElements = Th.nbe;
+int[int] bcon(NbBoundaryElements);
+real[int] xx(NbBoundaryElements+1),yy(NbBoundaryElements+1);
+for (int k = 0; k < NbBoundaryElements; k++){
+          bcon[k] = Th.be(k)[1];
+    xx[k]=Th(Th.be(k)[1]).x; yy[k]=Th(Th.be(k)[1]).y;
+}
+xx[NbBoundaryElements]=xx[0]; yy[NbBoundaryElements]=yy[0];
+
+real[int,int] bOut(3,1); real lOut = extractborder(Th, 1, bOut);
+
+cout << "\nindex; (x,y) manual; (x,y) extractborder;" << endl;
+for(int i=0;i<Th.nbe;i++){
+  cout << Th.be(i)[1] << "; (" << xx[i] << ", " << yy[i] << "); (" << bOut(0,i) << ", " << bOut(1,i) << ", " << bOut(2,i) << "); "<< endl;
+}
+
+cout << "\n(x,y) manual == (x,y) extractborder?" << endl;
+for(int i=0;i<Th.nbe+1;i++){
+  cout <<   (xx[i]==bOut(0,i)) && (yy[i]==bOut(1,i)) << endl;
+}
+
 
 // plot the "vectorized" boundary
 plot([Cx,Cy],wait=1,cmm="vectorized boundary");
