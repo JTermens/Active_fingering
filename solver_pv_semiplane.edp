@@ -154,7 +154,7 @@ for (int i=0; i<nSimul; i++){
     simulHomeDir = rootDir+"/"+simulName;
   }
 	
-  real Lx = 1;
+  real Lx = 2;
   real Ly = 2;
   real bLayerThickness = Lc/L0;	// Thickness of the boundary layer
 
@@ -180,7 +180,7 @@ for (int i=0; i<nSimul; i++){
 
   //FEM spaces
 	fespace Pol(Th, [P2, P2], periodic=perio);					  // For polarity vector
-   fespace Pola(Th, P2, periodic=perio);							// For |p| (not essential, just visualization)
+  fespace Pola(Th, P2, periodic=perio);							// For |p| (not essential, just visualization)
 	fespace dPol(Th,[P2,P2,P2,P2], periodic=perio);			// For the gradient of the polarity vector
 	fespace Vel(Th, [P1b, P1b], periodic=perio);				  // For velocity vector
 	fespace dVel(Th,[P1b,P1b,P1b,P1b], periodic=perio);	// For the gradient of the velocity vector

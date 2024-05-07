@@ -1,7 +1,7 @@
 // Parameter file for MDCK/MCF10a cells with stripe/semiplane
 // Estimations done by Carles Blanch at Blanch et al, Soft Matter 2017
 
-verbosity=0;
+verbosity=1;
 
 string rootDir = "/home/...";
 string[int] simulNames = ["test_MDCK_stripe"];
@@ -39,7 +39,7 @@ real[int] ampsLeft = [0.01];
 int[int] nModesLeft = [1];
 
 real[int] ampsRight = [0.01];
-int[int] nModesRight = [1];
+int[int] nModesRight = [2];
 
 if(bsave){
   for (int i=0; i<nSimul; i++){

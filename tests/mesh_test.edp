@@ -1,0 +1,242 @@
+// PACKAGES FOR ADVANCED REMESHING SCHEME
+load "Curvature"
+load "distance"
+load "isoline"
+load "gsl"
+
+//include <iostream>;
+
+
+// Mesh identifiers
+int labelBottom = 1;
+int labelRight = 2;
+int labelTop = 3;
+int labelLeft = 4;
+
+func perio=[[1,x],[3,x]]; // Periodicity
+
+func mesh meshSemiplane(int obd, int ibd, real bLayerThickness, real Lx, real Ly, real Amp, real qBnd){
+
+	int[int] labelChange = [labelTop,labelBottom];
+
+	mesh Th,ThHalfTop,ThHalfBottom,Thb; // Final mesh (Th) + auxyliary meshes
+
+	real xMaxBnd = Amp*cos(qBnd*Ly);
+
+	// Defien the borders for both the bulk and the layer meshes
+	border Bottom(t=0, 1){x=-Lx+(Lx+xMaxBnd-bLayerThickness)*t; y=-Ly; label=labelBottom;}
+	border BottomLayer(t=0, 1){x=xMaxBnd-bLayerThickness*(1-t); y=-Ly; label=labelBottom;}
+
+	border Top(t=0, 1){x=xMaxBnd-bLayerThickness-(Lx-bLayerThickness+xMaxBnd)*t; y=Ly; label=labelTop;}
+	border TopLayer(t=0, 1){x=xMaxBnd-bLayerThickness*t; y=Ly; label=labelTop;}
+
+	border Left(t=0,1){x=-Lx; y=Ly*(1-2*t); label=labelLeft;}
+
+	// change for a perturbed front, if needed. Mantain extreme points at x=0
+	border Right(t=0,1){x=0+Amp*cos(qBnd*Ly*(2*t-1)); y=Ly*(2*t-1); label=labelRight;}
+	// border Inner(t=0,1){x=-bLayerThickness+Amp*cos(qBnd*Ly*(2*t-1)); y=Ly*(2*t-1);}
+	border Inner(t=0,1){x=-3*Amp; y=Ly*(1-2*t);}
+
+	Th = buildmesh(
+		Bottom(ibd*(Lx-bLayerThickness))
+		+ BottomLayer(obd*bLayerThickness)
+		+ Right(obd*2.*Ly)
+		+ Inner(obd*2.*Ly)
+		+ TopLayer(obd*bLayerThickness)
+		+ Top(ibd*(Lx-bLayerThickness))
+		+ Left(ibd*2.*Ly)
+	);
+
+	Th = change(Th,rmInternalEdges=1);
+
+	return Th;
+}
+
+func mesh symmetricSemiplane(int obd, int ibd, real bLayerThickness, real Lx, real Ly, real Amp, int nMode){
+
+	int[int] labelChange = [labelTop,labelBottom];
+
+	mesh Th,ThHalfTop,ThHalfBottom,Thb; // Final mesh (Th) + auxyliary meshes
+
+	// Defien the borders for both the bulk and the layer meshes
+	border Bottom(t=0, 1){x=-Lx+(Lx+Amp-bLayerThickness)*t; y=0; label=labelBottom;}
+	border BottomLayer(t=0, 1){x=Amp-bLayerThickness*(1-t); y=0; label=labelBottom;}
+
+	border Top(t=0, 1){x=(Amp*cos(nMode*pi))-bLayerThickness-(Lx-bLayerThickness+(Amp*cos(nMode*pi)))*t; y=.5*Ly; label=labelTop;}
+	border TopLayer(t=0, 1){x=(Amp*cos(nMode*pi))-bLayerThickness*t; y=.5*Ly; label=labelTop;}
+
+	border Left(t=0,1){x=-Lx; y=.5*Ly*(1-t); label=labelLeft;}
+
+	// change for a perturbed front, if needed. Mantain extreme points at x=0
+	border Right(t=0,1){x=0+Amp*cos(nMode*t*pi); y=.5*Ly*t; label=labelRight;}
+	border Inner(t=0,1){x=-bLayerThickness+Amp*cos(nMode*t*pi); y=.5*Ly*t;}
+
+	ThHalfTop = buildmesh(
+		Bottom(ibd*(Lx-bLayerThickness))
+		+ BottomLayer(obd*bLayerThickness)
+		+ Right(obd*.5*Ly)
+		+ Inner(obd*.5*Ly)
+		+ TopLayer(obd*bLayerThickness)
+		+ Top(ibd*(Lx-bLayerThickness))
+		+ Left(ibd*.5*Ly)
+	);
+
+	ThHalfBottom = movemesh(ThHalfTop,[x,-y]);
+	ThHalfBottom = change(ThHalfBottom, label=labelChange);
+
+	Th = ThHalfTop + ThHalfBottom;
+	Th = change(Th,rmInternalEdges=1);
+
+	return Th;
+}
+
+func mesh periodicRemesh1side(mesh Th0,int obd, int ibd, real smoothCoef){
+
+	int[int] be(1); // To save begin and ends of the curve
+  	int minPoints = 5;
+
+	// Extract outer boundary pieces
+	// real[int,int] bTop(3,1); real lTop=extractborder(Th0,labelTop,bTop); // extract Top border
+	real[int,int] bRight(3,1); real lRight=extractborder(Th0,labelRight,bRight); // extract right border
+	real[int,int] bBottom(3,1); real lBottom=extractborder(Th0,labelBottom,bBottom); // extract bottom border
+	real[int,int] bLeft(3,1); real lLeft=extractborder(Th0,labelLeft,bLeft); // extract left border
+
+	// Remesh the Right (free boundary) using an spline
+	gslspline splineX(gslinterpakima, bRight(2, :), bRight(0, :)); 	// x(s) akima spline
+	gslspline splineY(gslinterpakima, bRight(2, :), bRight(1, :)); 	// y(s) akima spline
+	border Right(t=0,lRight){x=splineX(t);y=splineY(t);label=labelRight;}
+	int nRight = round(obd*lRight);	// new number of elements (prescribed density obd)
+
+	// Keep the same vertices for Bottom and Left (fixed sides)
+	border Bottom(t=0,1){ P=Curve(bBottom,bBottom(2,round(t*(bBottom.m-1)))/lBottom);label=labelBottom;}
+	border Left(t=0,1){ P=Curve(bLeft,bLeft(2,round(t*(bLeft.m-1)))/lLeft);label=labelLeft;}
+
+
+	// To ensure that points at the periodic boundary are equivalent, build the Top ones from the Bottom ones
+
+	real [int,int] bTop = bBottom;
+	// real[int,int] bTop(3,nPointsPerio);
+
+	for (int i=0; i<bBottom.m; i++)	{
+		bTop(1,i) = -bBottom(1,i);
+	}
+
+	border Top(t=0,1){ P=Curve(bTop,bTop(2,round(t*(bTop.m-1)))/lBottom);label=labelTop;}
+
+	// fespace Dh(Th0, P1);	 // Uncomment generates segmentation fault, don't know why could not be defined here
+
+	// // Distance function (d is the minimal distance to the boundary)
+	// varf vong(B, d)= on(labelRight,B=1);
+	// real[int] ong=vong(0,Dh);
+	// Dh B =1, d;
+	// B[] = ong ? 0 : B[];
+	// distance(Th0,B,d[]);
+	// //plot(d,Th0, wait=1);
+
+	// // Get the new inner boundary vertices (ISO is the contour d==bLayerThickness)
+	// real[int,int] ISO(3,1); int nc=isoline(Th0,d,iso=bLayerThickness,close=0,ISO,beginend=be,smoothing=bLayerThickness*smoothCoef,ratio=1.e0);
+	
+	// int nInnerLines = be.n/2;
+	// // cout << be << endl;
+
+	// int[int] nInner(nInnerLines); // numer of points per loop
+	// int nCorrectLines = 0; // number of loops with more than minPoints
+	// // find number of points and count > minPoints
+	// for (int i=0;  i < nInnerLines; i++){
+	//   real lInner=ISO(2,be(i*2+1)-1);
+	//   nInner[i] = round(obd*lInner);
+	//   if(nInner[i] > minPoints){nCorrectLines++;}
+	// }
+		
+	// // if the number of points is less than minPoints, filter the border for safety
+	// int[int] nInnerFilter(nCorrectLines);
+	// int[int] beFilter(2*nCorrectLines);
+
+	// for (int i=0;  i < nInnerLines; i++){
+	//   if(nInner[i] > minPoints){
+	//     nInnerFilter[i] = nInner[i];
+	//     beFilter[2*i] = be[i*2];
+	//     beFilter[2*i+1] = be[i*2+1];
+	//   }
+	// }
+  
+  	// border Inner(t=0,1;i) {P=Curve(ISO,beFilter(i*2),beFilter(i*2+1)-1,t);} // Inner boundary multi-border
+	// cout << nInner << endl;
+
+	plot(/*buildmesh(*/Left(bLeft.m-1)+Bottom(bBottom.m-1)+Right(nRight)+Top(-bTop.m)/*+Inner(nInnerFilter))*/, wait=1); plot(Top(-bTop.m), wait=1);
+	mesh Th = buildmesh(Left(bLeft.m-1)+Bottom(bBottom.m-1)+Right(nRight)+Top(-(bTop.m-1))/*+Inner(nInnerFilter)*/);
+	Th = change(Th, rmInternalEdges=1);
+
+   return Th;
+}
+
+//Macros
+macro pD [pDx, pDy] // P2 extension for Dirichlet data
+macro p [px, py] // Polarity vector field
+macro q [qx, qy] // Polarity test functions
+
+macro grad(u) [dx(u),dy(u)] // Gradient of a sclar
+
+real Ly = 3*pi/2.;
+real Lc = 40.;
+real Lx = 100;
+
+int obd = 15;
+int ibd = 2;
+real amplitude = 1;
+real qBnd = 4;
+real smoothCoef = .5;
+
+
+real c = 1; // R0 and nematic length ratio
+real bLayerThickness = 2*amplitude;	// Thickness of the boundary layer
+
+mesh Th = meshSemiplane(obd, ibd, bLayerThickness, Lx, Ly,amplitude,qBnd);
+
+real Area0=Th.measure; // Inital Area of the Fluid Domain
+
+plot(Th,value = true, fill = false, nbiso=64, wait=true, cmm = "adaptive mesh;  A0="+Area0, bb=[[-1.1*Lx,-1.1*Ly],[1.5,1.1*Ly]]);
+
+// Th = periodicRemesh1side(Th,obd,ibd,.5);
+
+// real[int,int] bTop(3,1); real lTop=extractborder(Th,labelTop,bTop); // extract Top border
+// real[int,int] bBottom(3,1); real lBottom=extractborder(Th,labelBottom,bBottom); // extract bottom border
+
+// cout << bTop << "\n" << bBottom << endl;
+
+// plot(Th,value = true, fill = false, nbiso=64, wait=true, cmm = "adaptive mesh;  A0="+Area0, bb=[[-1.1*Lx,-1.1*Ly],[1.5,1.1*Ly]]);
+
+
+fespace Pol(Th, [P2, P2], periodic=perio); // For polarity vector
+fespace Pola(Th, P2, periodic=perio); // For |p| (not essential, just visualization)
+
+// P2 extension of polarity Dirichlet data
+varf bndDirichlet(pD, q) = on(labelRight, pDx = N.x) + on(labelRight, pDy = N.y) + on(labelLeft, pDx = 0) + on(labelLeft, pDy = 0);// + on(labelRight, p1 = nx) + on(labelRight, p2 = ny);
+Pol pD=[0,0];
+pDx[] = bndDirichlet(0, Pol, tgv = 1.0);
+
+if (verbosity) {
+plot(pDx, value = true, fill = true, nbiso=64, wait=true, cmm = "pDx", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
+plot(pDy, value = true, fill = true, nbiso=64, wait=true, cmm = "pDy", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
+}
+// Bilinear and linear variational forms P (Modified Homogeneous Drirchlet problem for p-pD)
+varf ap(p, q) = int2d(Th)(  grad(px)'*grad(qx) + grad(py)'*grad(qy) )  + int2d(Th)(c*c*(p'*q)) + on(labelRight, px = 0.0) + on(labelRight, py=0.0) + on(labelLeft, px = 0.0) + on(labelLeft, py=0.0);
+varf lp(p, q) = -int2d(Th)( grad(pDx)'*grad(qx) + grad(pDy)'*grad(qy) ) - int2d(Th)(c*c*(pD'*q))  + on(labelRight, px = 0.0) + on(labelRight, py=0.0) + on(labelLeft, px = 0.0) + on(labelLeft, py=0.0);
+
+// Assembly P
+matrix Ap = ap(Pol, Pol, tgv = -2); // LHS matrix
+real[int] bp = lp(0, Pol); // RHS
+
+// P solution with vanishing Dirichlet data
+real[int] solP(Pol.ndof);
+//set(Ap,solver=sparsesolver);
+solP=Ap^-1*bp;
+Pol p=[0,0];
+px[]=solP(0:Pol.ndof-1);
+
+// P solution
+p = p + pD;
+
+Pola pABS = sqrt(px(x,y)^2 + py(x,y)^2); // Abs(P)
+plot(Th,pABS, value = true, fill = true, nbiso = 64, wait = true, cmm = "|p|", bb=[[-1.1*Lx,-1.1*Ly],[1.5,Ly]]);
+

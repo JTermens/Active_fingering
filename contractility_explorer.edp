@@ -1,0 +1,105 @@
+// PACKAGES FOR ADVANCED REMESHING SCHEME
+load "Curvature"
+load "distance"
+load "isoline"
+load "gsl"
+
+// Manage command-line arguments
+include "getARGV.idp"
+
+// include <iostream>; // If needed
+
+int iRun = getARGV("-i", 1);
+bool err = 0;
+
+//include <iostream>;
+include "parameters_sets/params_contractility_exploration.edp";
+include "lib/meshes.edp"; // load the mesh generation & remeshing functions
+
+string simulHomeDir = rootDir+"/"+simulName;
+string fileNameParams = "/params.csv";
+string fileNameParamsMhs = "/params_msh.csv";
+string fileNameGlobalSols = "/global_sols.csv";
+
+if (iRun == 0){
+	exec("mkdir "+simulHomeDir);	// Make a home directory for the simulation
+	exec("mkdir "+simulHomeDir+"/msh");	// Make and save the meshes in a separeted directory
+	exec("mkdir "+simulHomeDir+"/local_sols");	// Make and save the local solutions in a separeted directory
+
+	{ofstream fileParamsMhs (simulHomeDir+fileNameParamsMhs); // Generate a separate file for the mesh parameters
+
+		//fileParamsMhs.fixed;
+		fileParamsMhs << "Mesh_Parameters" << endl
+					  << "q,Amp,Lx,Ly,obd,ibd,BndLayer,pathMesh" << endl;
+	}
+
+	{ofstream fileGlobalSols (simulHomeDir+fileNameGlobalSols); // Generate a separate file for the global variables (integrates ones)
+
+		//fileGlobalSol.fixed;
+		fileGlobalSols << "Global_Solutions" << endl
+					  << "q,"<<"Amp,"<<"LaLc,"<<"LambdaLc,pathMsh,pathLocalSol" << endl
+					  << "adim,"<<"adim,"<<"adim,path,path" << endl;
+	}
+}
+
+//Macros
+macro pD [pDx, pDy] //                              // P2 extension for Dirichlet data
+macro p [px, py] //                                 // Polarity vector field
+macro q [qx, qy] //                                 // Polarity test functions
+macro v [vx, vy] //                                 // Velocity vector field
+macro u [ux, uy] //                                 // Velocity test functions
+
+macro dp [dpxdx,dpxdy,dpydx,dpydy] //               // Gradient of the polarity field
+macro dq [dqxdx,dqxdy,dqydx,dqydy] //               // Gradient of the polarity test functions
+macro dv [dvxdx,dvxdy,dvydx,dvydy] //               // Gradient of the velocity field
+macro du [duxdx,duxdy,duydx,duydy] //               // Gradient of the velocity test functions
+macro d2px [dpxdxx,dpxdxy,dpxdyx,dpxdyy] //			// Hessian of the x-polarity
+macro d2py [dpydxx,dpydxy,dpydyx,dpydyy] //			// Hessian of the y-polarity
+macro d2qx [dqxdxx,dqxdxy,dqxdyx,dqxdyy] //			// Hessian of the x-polarity test function
+macro d2qy [dqydxx,dqydxy,dqydyx,dqydyy] //			// Hessian of the y-polarity test function
+			
+macro grad(u) [dx(u),dy(u)] //                      // Gradient of a sclar
+macro Grad(ux,uy) [dx(ux),dy(ux),dx(uy),dy(uy)] //  // Gradient of a vector
+macro GradT(ux,uy) [dx(ux),dx(uy),dy(ux),dy(uy)] // // Grad vector transpose
+macro Hessian(u) [dxx(u),dxy(u),dyx(u),dyy(u)] //	// Hessian of a scalar
+macro pp(px,py) [px*px,px*py,py*px,py*py] //        // Active stress tensor
+
+for (int iq=i0q[iRun]; iq<ifq[iRun]; iq++){
+
+	string qName =	qNames[iq];
+	string fileNameMsh = "/msh/mesh_"+qName+".msh";
+	real q = qs[iq] // q of the perturbed semiplane domain
+    real Amp = Amps[iRun]
+
+    real ampLx = Amp
+    real c = Lx/Lc; // R0 and nematic length ratio
+    real bLayerThickness = Lc/Lx;	// Thickness of the boundary layer
+    Th = meshSemiplane(obd, ibd, bLayerThickness, Lx, Ly,Amp,q);
+
+	{ofstream fileParamsMhs (simulHomeDir+fileNameParamsMhs, append);
+
+  	fileParamsMhs.fixed;
+		fileParamsMhs << q <<","<< Amp <<","<< Lx <<","<< Ly <<","<< obd <<","<< ibd <<","<< bLayerThickness <<","<< fileNameMsh << endl;
+	}
+	
+	// Plot the initial mesh
+	if (debug) {
+		plot(Th,value = true, fill = false, nbiso=64, wait=true, cmm = "adaptive mesh;  qLc="+q);
+		}
+
+	// Save initial mesh
+  	savemesh(Th,simulHomeDir+fileNameMsh);
+
+	//FEM spaces
+	fespace Pol(Th, [P2, P2]);			// For polarity vector
+	fespace dPol(Th,[P2,P2,P2,P2]);		// For the gradient of the polarity vector
+	fespace Pola(Th, P2 );				// For |p| (not essential, just visualization)
+	fespace Vel(Th, [P1b, P1b]);		// For velocity vector
+	fespace dVel(Th,[P1b,P1b,P1b,P1b]);	// For the gradient of the velocity vector
+	// fespace Dh(Th, P1);				// For distance function (remeshing scheme) and data exports
+	fespace Nh(Th,[P1,P1]);				// For the corrected normal vector at the boundary
+
+	for (int iLaLc=0; iLaLc<nLaLc; iLaLc++){
+
+    }
+}
