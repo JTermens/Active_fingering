@@ -21,40 +21,40 @@ func perio=[[1,x],[3,x]]; // Periodicity
 
 func mesh symmetricSemiplane(int obd, int ibd, real bLayerThickness, real Lx, real Ly, real Amp, int nMode){
 
-	int[int] labelChange = [labelTop,labelBottom];
+  int[int] labelChange = [labelTop,labelBottom];
 
-	mesh Th,ThHalfTop,ThHalfBottom,Thb; // Final mesh (Th) + auxyliary meshes
+  mesh Th,ThHalfTop,ThHalfBottom,Thb; // Final mesh (Th) + auxyliary meshes
 
-	// Defien the borders for both the bulk and the layer meshes
-	border Bottom(t=0, 1){x=-Lx+(Lx+Amp-bLayerThickness)*t; y=0; label=labelBottom;}
-	border BottomLayer(t=0, 1){x=Amp-bLayerThickness*(1-t); y=0; label=labelBottom;}
+  // Defien the borders for both the bulk and the layer meshes
+  border Bottom(t=0, 1){x=-Lx+(Lx+Amp-bLayerThickness)*t; y=0; label=labelBottom;}
+  border BottomLayer(t=0, 1){x=Amp-bLayerThickness*(1-t); y=0; label=labelBottom;}
 
-	border Top(t=0, 1){x=(Amp*cos(nMode*pi))-bLayerThickness-(Lx-bLayerThickness+(Amp*cos(nMode*pi)))*t; y=.5*Ly; label=labelTop;}
-	border TopLayer(t=0, 1){x=(Amp*cos(nMode*pi))-bLayerThickness*t; y=.5*Ly; label=labelTop;}
+  border Top(t=0, 1){x=(Amp*cos(nMode*pi))-bLayerThickness-(Lx-bLayerThickness+(Amp*cos(nMode*pi)))*t; y=.5*Ly; label=labelTop;}
+  border TopLayer(t=0, 1){x=(Amp*cos(nMode*pi))-bLayerThickness*t; y=.5*Ly; label=labelTop;}
 
-	border Left(t=0,1){x=-Lx; y=.5*Ly*(1-t); label=labelLeft;}
+  border Left(t=0,1){x=-Lx; y=.5*Ly*(1-t); label=labelLeft;}
 
-	// change for a perturbed front, if needed. Mantain extreme points at x=0
-	border Right(t=0,1){x=0+Amp*cos(nMode*t*pi); y=.5*Ly*t; label=labelRight;}
-	border Inner(t=0,1){x=-bLayerThickness+Amp*cos(nMode*t*pi); y=.5*Ly*t;}
+  // change for a perturbed front, if needed. Mantain extreme points at x=0
+  border Right(t=0,1){x=0+Amp*cos(nMode*t*pi); y=.5*Ly*t; label=labelRight;}
+  border Inner(t=0,1){x=-bLayerThickness+Amp*cos(nMode*t*pi); y=.5*Ly*t;}
 
-	ThHalfTop = buildmesh(
-		Bottom(ibd*(Lx-bLayerThickness))
-		+ BottomLayer(obd*bLayerThickness)
-		+ Right(obd*.5*Ly)
-		+ Inner(obd*.5*Ly)
-		+ TopLayer(obd*bLayerThickness)
-		+ Top(ibd*(Lx-bLayerThickness))
-		+ Left(ibd*.5*Ly)
-	);
+  ThHalfTop = buildmesh(
+    Bottom(ibd*(Lx-bLayerThickness))
+    + BottomLayer(obd*bLayerThickness)
+    + Right(obd*.5*Ly)
+    + Inner(obd*.5*Ly)
+    + TopLayer(obd*bLayerThickness)
+    + Top(ibd*(Lx-bLayerThickness))
+    + Left(ibd*.5*Ly)
+  );
 
-	ThHalfBottom = movemesh(ThHalfTop,[x,-y]);
-	ThHalfBottom = change(ThHalfBottom, label=labelChange);
+  ThHalfBottom = movemesh(ThHalfTop,[x,-y]);
+  ThHalfBottom = change(ThHalfBottom, label=labelChange);
 
-	Th = ThHalfTop + ThHalfBottom;
-	Th = change(Th,rmInternalEdges=1);
+  Th = ThHalfTop + ThHalfBottom;
+  Th = change(Th,rmInternalEdges=1);
 
-	return Th;
+  return Th;
 }
 
 // mesh Th = symmetricSemiplane(obd, ibd, bLayerThickness, Lx);
@@ -62,29 +62,29 @@ func mesh symmetricSemiplane(int obd, int ibd, real bLayerThickness, real Lx, re
 
 func mesh periodicRemesh1side(mesh Th0,int obd, int ibd, real smoothCoef){
 
-	int[int] be(1); // To save begin and ends of the curve
+  int[int] be(1); // To save begin and ends of the curve
   int minPoints = 5;
 
-	// Extract outer boundary pieces
-	real[int,int] bTop(3,1); real lTop=extractborder(Th0,labelTop,bTop); // extract Top border
-	real[int,int] bRight(3,1); real lRight=extractborder(Th0,labelRight,bRight); // extract right border
-	real[int,int] bBottom(3,1); real lBottom=extractborder(Th0,labelBottom,bBottom); // extract bottom border
-	real[int,int] bLeft(3,1); real lLeft=extractborder(Th0,labelLeft,bLeft); // extract left border
+  // Extract outer boundary pieces
+  real[int,int] bTop(3,1); real lTop=extractborder(Th0,labelTop,bTop); // extract Top border
+  real[int,int] bRight(3,1); real lRight=extractborder(Th0,labelRight,bRight); // extract right border
+  real[int,int] bBottom(3,1); real lBottom=extractborder(Th0,labelBottom,bBottom); // extract bottom border
+  real[int,int] bLeft(3,1); real lLeft=extractborder(Th0,labelLeft,bLeft); // extract left border
 
-	// Remesh the Right (free boundary) using an spline
-	gslspline splineX(gslinterpakima, bRight(2, :), bRight(0, :)); 	// x(s) akima spline
-	gslspline splineY(gslinterpakima, bRight(2, :), bRight(1, :)); 	// y(s) akima spline
-	border Right(t=0,lRight){x=splineX(t);y=splineY(t);label=labelRight;}
-	int nRight = round(obd*lRight);	// new number of elements (prescribed density obd)
+  // Remesh the Right (free boundary) using an spline
+  gslspline splineX(gslinterpakima, bRight(2, :), bRight(0, :)); 	// x(s) akima spline
+  gslspline splineY(gslinterpakima, bRight(2, :), bRight(1, :)); 	// y(s) akima spline
+  border Right(t=0,lRight){x=splineX(t);y=splineY(t);label=labelRight;}
+  int nRight = round(obd*lRight);	// new number of elements (prescribed density obd)
 
-	// Keep the same vertices for the fixed sides
-	border Top(t=0,1){ P=Curve(bTop,bTop(2,round(t*(bTop.m-1)))/lTop);label=labelTop;}
-	border Bottom(t=0,1){ P=Curve(bBottom,bBottom(2,round(t*(bBottom.m-1)))/lBottom);label=labelBottom;}
-	border Left(t=0,1){ P=Curve(bLeft,bLeft(2,round(t*(bLeft.m-1)))/lLeft);label=labelLeft;}
+  // Keep the same vertices for the fixed sides
+  border Top(t=0,1){ P=Curve(bTop,bTop(2,round(t*(bTop.m-1)))/lTop);label=labelTop;}
+  border Bottom(t=0,1){ P=Curve(bBottom,bBottom(2,round(t*(bBottom.m-1)))/lBottom);label=labelBottom;}
+  border Left(t=0,1){ P=Curve(bLeft,bLeft(2,round(t*(bLeft.m-1)))/lLeft);label=labelLeft;}
 
-	// fespace Dh(Th0, P1);	 // Uncomment generates segmentation fault, don't know why could not be defined here
+  // fespace Dh(Th0, P1);	 // Uncomment generates segmentation fault, don't know why could not be defined here
 
-	// // Distance function (d is the minimal distance to the boundary)
+  // // Distance function (d is the minimal distance to the boundary)
   // varf vong(B, d)= on(labelRight,B=1);
   // real[int] ong=vong(0,Dh);
   // Dh B =1, d;
@@ -106,7 +106,7 @@ func mesh periodicRemesh1side(mesh Th0,int obd, int ibd, real smoothCoef){
   //   nInner[i] = round(obd*lInner);
   //   if(nInner[i] > minPoints){nCorrectLines++;}
   // }
-	
+  
   // // if the number of points is less than minPoints, filter the border for safety
   // int[int] nInnerFilter(nCorrectLines);
   // int[int] beFilter(2*nCorrectLines);
@@ -120,11 +120,11 @@ func mesh periodicRemesh1side(mesh Th0,int obd, int ibd, real smoothCoef){
   // }
   
   // border Inner(t=0,1;i) {P=Curve(ISO,beFilter(i*2),beFilter(i*2+1)-1,t);} // Inner boundary multi-border
-	// cout << nInner << endl;
+  // cout << nInner << endl;
 
-	// plot(buildmesh(Left(bLeft.m-1)+Bottom(bBottom.m-1)+Right(nRight)+Top(bTop.m-1)+Inner(nInnerFilter)), wait=1);
-	mesh Th = buildmesh(Left(bLeft.m-1)+Bottom(bBottom.m-1)+Right(nRight)+Top(bTop.m-1)/*+Inner(nInnerFilter)*/);
-	Th = change(Th, rmInternalEdges=1);
+  // plot(buildmesh(Left(bLeft.m-1)+Bottom(bBottom.m-1)+Right(nRight)+Top(bTop.m-1)+Inner(nInnerFilter)), wait=1);
+  mesh Th = buildmesh(Left(bLeft.m-1)+Bottom(bBottom.m-1)+Right(nRight)+Top(bTop.m-1)/*+Inner(nInnerFilter)*/);
+  Th = change(Th, rmInternalEdges=1);
 
   return Th;
 }
@@ -140,7 +140,7 @@ macro dp [dpxdx,dpxdy,dpydx,dpydy]								// Gradient of the polarity field
 macro dq [dqxdx,dqxdy,dqydx,dqydy]								// Gradient of the polarity test functions
 macro dv [dvxdx,dvxdy,dvydx,dvydy]								// Gradient of the velocity field
 macro du [duxdx,duxdy,duydx,duydy]								// Gradient of the velocity test functions
-			
+      
 macro grad(u) [dx(u),dy(u)]												// Gradient of a sclar
 macro Grad(ux,uy) [dx(ux),dy(ux),dx(uy),dy(uy)]		// Gradient of a vector
 macro GradT(ux,uy) [dx(ux),dx(uy),dy(ux),dy(uy)]	// Grad vector transpose
@@ -153,7 +153,7 @@ for (int i=0; i<nSimul; i++){
   if (bsave){
     simulHomeDir = rootDir+"/"+simulName;
   }
-	
+  
   real Lx = 2;
   real Ly = 2;
   real bLayerThickness = Lc/L0;	// Thickness of the boundary layer
@@ -175,18 +175,18 @@ for (int i=0; i<nSimul; i++){
   real Areai=Area0;
 
   if (verbosity) {
-  	plot(Th,value = true, fill = false, nbiso=64, wait=true, cmm = "adaptive mesh;  A0="+Area0, bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
+    plot(Th,value = true, fill = false, nbiso=64, wait=true, cmm = "adaptive mesh;  A0="+Area0, bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
   }
 
   //FEM spaces
-	fespace Pol(Th, [P2, P2], periodic=perio);					  // For polarity vector
+  fespace Pol(Th, [P2, P2], periodic=perio);					  // For polarity vector
   fespace Pola(Th, P2, periodic=perio);							// For |p| (not essential, just visualization)
-	fespace dPol(Th,[P2,P2,P2,P2], periodic=perio);			// For the gradient of the polarity vector
-	fespace Vel(Th, [P1b, P1b], periodic=perio);				  // For velocity vector
-	fespace dVel(Th,[P1b,P1b,P1b,P1b], periodic=perio);	// For the gradient of the velocity vector
-	fespace Dh(Th, P1);									                    // For distance function (remeshing scheme) and data exports
-	fespace Vor(Th,P1b, periodic=perio);								  // To compute the vorticity & divergence
-	//fespace Nh(Th,[P1,P1]);							                  // For the corrected normal vector at the boundary
+  fespace dPol(Th,[P2,P2,P2,P2], periodic=perio);			// For the gradient of the polarity vector
+  fespace Vel(Th, [P1b, P1b], periodic=perio);				  // For velocity vector
+  fespace dVel(Th,[P1b,P1b,P1b,P1b], periodic=perio);	// For the gradient of the velocity vector
+  fespace Dh(Th, P1);									                    // For distance function (remeshing scheme) and data exports
+  fespace Vor(Th,P1b, periodic=perio);								  // To compute the vorticity & divergence
+  //fespace Nh(Th,[P1,P1]);							                  // For the corrected normal vector at the boundary
 
   //-------------------------------------------------------------------------------------------------------------------
   // Correction of the normal vectors at the boundary - May not be needed
@@ -225,7 +225,7 @@ for (int i=0; i<nSimul; i++){
   pDx[] = bndDirichlet(0, Pol, tgv = 1.0);
 
   if (verbosity) {
-  	plot(pDx, value = true, fill = true, nbiso=64, wait=true, cmm = "pDx", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
+    plot(pDx, value = true, fill = true, nbiso=64, wait=true, cmm = "pDx", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
     plot(pDy, value = true, fill = true, nbiso=64, wait=true, cmm = "pDy", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
   }
   // Bilinear and linear variational forms P (Modified Homogeneous Drirchlet problem for p-pD)
@@ -244,7 +244,7 @@ for (int i=0; i<nSimul; i++){
   px[]=solP(0:Pol.ndof-1);
 
   if (verbosity) {
-  	plot(Th,px, value = true, fill = true, nbiso=64, wait=true, cmm = "dpx = px-pDx", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
+    plot(Th,px, value = true, fill = true, nbiso=64, wait=true, cmm = "dpx = px-pDx", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
     plot(Th,py, value = true, fill = true, nbiso=64, wait=true, cmm = "dpy = py-pDy", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
   }
 
@@ -264,10 +264,10 @@ for (int i=0; i<nSimul; i++){
   dpxdx[]=solGradP(0:dPol.ndof-1);
 
   if (verbosity) {
-  	plot(Th,px, value = true, fill = true, nbiso = 64, wait = true, cmm = "px", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
+    plot(Th,px, value = true, fill = true, nbiso = 64, wait = true, cmm = "px", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
     plot(Th,py, value = true, fill = true, nbiso = 64, wait = true, cmm = "py", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
-  	Pola pABS = sqrt(px(x,y)^2 + py(x,y)^2); // Abs(P)
-  	plot(Th,pABS, value = true, fill = true, nbiso = 64, wait = true, cmm = "|p|", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
+    Pola pABS = sqrt(px(x,y)^2 + py(x,y)^2); // Abs(P)
+    plot(Th,pABS, value = true, fill = true, nbiso = 64, wait = true, cmm = "|p|", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
   }
 
   // Bilinear and linear variational forms V
@@ -298,10 +298,10 @@ for (int i=0; i<nSimul; i++){
   dvxdx[]=solGradV(0:dVel.ndof-1);
 
   if (verbosity) {
-  	plot(Th,vx, value = true, fill = true, nbiso = 64, wait = true, cmm = "vx", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
+    plot(Th,vx, value = true, fill = true, nbiso = 64, wait = true, cmm = "vx", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
     plot(Th,vy, value = true, fill = true, nbiso = 64, wait = true, cmm = "vy", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
-  	Pola vABS = sqrt(vx(x,y)^2 + vy(x,y)^2);  // Abs(v)
-  	plot(Th,vABS, value = true, fill = true, nbiso = 64, wait = true, cmm = "|v|", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
+    Pola vABS = sqrt(vx(x,y)^2 + vy(x,y)^2);  // Abs(v)
+    plot(Th,vABS, value = true, fill = true, nbiso = 64, wait = true, cmm = "|v|", bb=[[-1.1*Lx,-Ly],[1.5,Ly]]);
   }
 
   // INtegrated variables not needed
@@ -314,11 +314,11 @@ for (int i=0; i<nSimul; i++){
   // Iterate time
   for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
 
-  	if (iterTime % 100 == 0 && iterTime > 0) {
-  		cout << iterTime << " out of " << NiterTime << " iterations completed" << endl;
-  	}
+    if (iterTime % 100 == 0 && iterTime > 0) {
+      cout << iterTime << " out of " << NiterTime << " iterations completed" << endl;
+    }
 
-  	//-------------------------------------------------------------------------------------------------------------------
+    //-------------------------------------------------------------------------------------------------------------------
     // Correction of the normal vectors at the boundary - May not be needed
     // int NbBoundaryElements = Th.nbe;
     // int[int] bcon(NbBoundaryElements);
@@ -349,7 +349,7 @@ for (int i=0; i<nSimul; i++){
     // }
     //-------------------------------------------------------------------------------------------------------------------
 
-  	// P2 extension of polarity Dirichlet data
+    // P2 extension of polarity Dirichlet data
     varf bndDirichlet(pD, q) = on(labelRight, pDx = N.x) + on(labelRight, pDy = N.y) + on(labelLeft, pDx = 0) + on(labelLeft, pDy = 0);// + on(labelRight, p1 = nx) + on(labelRight, p2 = ny);
     Pol pD=[0,0];
     pDx[] = bndDirichlet(0, Pol, tgv = 1.0);
@@ -405,50 +405,50 @@ for (int i=0; i<nSimul; i++){
 
     real Areai = Th.measure;					// Current Area
 
-  	// Plot V
-  	// if (verbosity) { // Show it always, regardless of the verbosity
+    // Plot V
+    // if (verbosity) { // Show it always, regardless of the verbosity
       Pola vABS = sqrt(vx(x,y)^2 + vy(x,y)^2);
-  		plot(/*Th,*/vABS, value = true, fill = true, nbiso = 64, wait = false, bb=[[-1.1*Lx,-Ly],[1.5,Ly]],
-  				cmm = "t="+(dt*iterTime)+";  A/A0="+(Areai/Area0));
-  	// }
+      plot(/*Th,*/vABS, value = true, fill = true, nbiso = 64, wait = false, bb=[[-1.1*Lx,-Ly],[1.5,Ly]],
+          cmm = "t="+(dt*iterTime)+";  A/A0="+(Areai/Area0));
+    // }
 
-  	// Export data
-  	if(iterTime % dsave == 0 && bsave==1){
-  		
+    // Export data
+    if(iterTime % dsave == 0 && bsave==1){
+      
       string fileNameLocalSol = "/local_sol/sol_"+simulName+"_Rend"+(1000000+iterTime)+".txt";
       string fileNameMsh = "/msh/mesh_"+simulName+"_Rend"+(1000000+iterTime)+".msh";
 
-  		// Save {px, py, vx, vy, dpxdx, dpxdy, dpydx, dpydy, dvxdx, dvxdy, dvydx, dvydy} on each vertex:
-  		// Memory efficient method, but needs connectivity data to reconstruct the mesh
-  		{ofstream fileLocalSols (simulHomeDir+fileNameLocalSol);
-  			
-				fileLocalSols.fixed;
-  			int NbVertices = Th.nv;
-  			fileLocalSols << "# LocalSolutions" << endl
-											<< "# NumFields: " << 12 << "	NumberVertices: " << NbVertices 
+      // Save {px, py, vx, vy, dpxdx, dpxdy, dpydx, dpydy, dvxdx, dvxdy, dvydx, dvydy} on each vertex:
+      // Memory efficient method, but needs connectivity data to reconstruct the mesh
+      {ofstream fileLocalSols (simulHomeDir+fileNameLocalSol);
+        
+        fileLocalSols.fixed;
+        int NbVertices = Th.nv;
+        fileLocalSols << "# LocalSolutions" << endl
+                      << "# NumFields: " << 12 << "	NumberVertices: " << NbVertices 
                       << " iter: " << iterTime << " time: " << dt*iterTime << endl
-  										<< "# px	py	vx	vy	dpxdx	dpxdy	dpydx	dpydy	dvxdx	dvxdy	dvydx	dvydy" << endl;
-  			for (int i = 0; i < NbVertices; i++){
-  				fileLocalSols << px(Th(i).x,Th(i).y) 		<< "	" << py(Th(i).x,Th(i).y) 		<< "	"  // {px,py}
-												<< vx(Th(i).x,Th(i).y) 		<< "	" << vy(Th(i).x,Th(i).y) 		<< "	"	 // {vx,vy}
-												<< dpxdx(Th(i).x,Th(i).y) << "	" << dpxdy(Th(i).x,Th(i).y) << "	"	 //	{dpxdx,dpxdy}
-												<< dpydx(Th(i).x,Th(i).y) << "	" << dpydy(Th(i).x,Th(i).y) << "	"	 // {dpydx,dpydy}
-												<< dvxdx(Th(i).x,Th(i).y) << "	" << dvxdy(Th(i).x,Th(i).y) << "	"	 // {dvxdx,dvxdy}
-												<< dvydx(Th(i).x,Th(i).y) << "	" << dvydy(Th(i).x,Th(i).y) << endl; // {dvydx,dvydy}
-  			}
-  		}
+                      << "# px	py	vx	vy	dpxdx	dpxdy	dpydx	dpydy	dvxdx	dvxdy	dvydx	dvydy" << endl;
+        for (int i = 0; i < NbVertices; i++){
+          fileLocalSols << px(Th(i).x,Th(i).y) 		<< "	" << py(Th(i).x,Th(i).y) 		<< "	"  // {px,py}
+                        << vx(Th(i).x,Th(i).y) 		<< "	" << vy(Th(i).x,Th(i).y) 		<< "	"	 // {vx,vy}
+                        << dpxdx(Th(i).x,Th(i).y) << "	" << dpxdy(Th(i).x,Th(i).y) << "	"	 //	{dpxdx,dpxdy}
+                        << dpydx(Th(i).x,Th(i).y) << "	" << dpydy(Th(i).x,Th(i).y) << "	"	 // {dpydx,dpydy}
+                        << dvxdx(Th(i).x,Th(i).y) << "	" << dvxdy(Th(i).x,Th(i).y) << "	"	 // {dvxdx,dvxdy}
+                        << dvydx(Th(i).x,Th(i).y) << "	" << dvydy(Th(i).x,Th(i).y) << endl; // {dvydx,dvydy}
+        }
+      }
 
       // New save
       savemesh(Th,simulHomeDir+fileNameMsh);
 
-  		// { ofstream fileTimeSeries (pathDir+"/timeSeries.csv", append);
-  		// 		fileTimeSeries	<< dt*iterTime   <<","<< Areai     <<","<< Xcm  <<","<< Ycm  <<","
-  		// 									 	<< Vxcm      <<","<< Vycm      <<","<< Pxcm <<","<< Pycm <<","
-  		// 										<< DivTermsX <<","<< DivTermsY <<"\n";
-  		// }
-  	}
+      // { ofstream fileTimeSeries (pathDir+"/timeSeries.csv", append);
+      // 		fileTimeSeries	<< dt*iterTime   <<","<< Areai     <<","<< Xcm  <<","<< Ycm  <<","
+      // 									 	<< Vxcm      <<","<< Vycm      <<","<< Pxcm <<","<< Pycm <<","
+      // 										<< DivTermsX <<","<< DivTermsY <<"\n";
+      // }
+    }
 
-  	// Move mesh
+    // Move mesh
     // real minT0 = checkmovemesh(Th, [x, y]); // to check for flipped triangles
     // real minT = checkmovemesh(Th, [x+dt*Vvx,y+dt*vy]);
     // cout << "Min triangle area before: "+minT0+" & after: "+minT<<endl;
