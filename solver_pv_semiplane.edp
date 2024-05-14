@@ -130,7 +130,7 @@ func mesh periodicRemesh1side(mesh Th0,int obd, int ibd, real smoothCoef){
 }
 
 //Macros
-macro pD [pDx, pDy]																// P2 extension for Dirichlet data
+macro pD [pDx, pDy]	//															// P2 extension for Dirichlet data
 macro p [px, py]																	// Polarity vector field
 macro q [qx, qy]																	// Polarity test functions
 macro v [vx, vy]																	// Velocity vector field
