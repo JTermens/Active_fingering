@@ -1,240 +1,344 @@
-func mesh fourCurveShape(int obd, real rUp, real rDown, real rLeft,real rRight, real d, real symmAxis, int labelBnd){
+// Packages for advanced remeshing scheme
+load "Curvature"
+load "distance"
+load "isoline"
+load "gsl"
 
-	mesh Th; // Final mesh (Th)
+func real[int,int] computeArchlength(real[int,int] b0, int n0, int i0, int i1){
+  real[int,int] b1(3,n0);
+  b1(0,:) = b0(0,:); b1(1,:) = b0(1,:);
+  b1(2,i0) = 0;
+  for (int i=i0+1; i<i1; i++){
+    b1(2,i) = b1(2,i-1) + dist((b1(0,i)-b1(0,i-1)),(b1(1,i)-b1(1,i-1)));
+  }
+  return b1;
+}
 
-	if (((d+rUp-rDown-2*rRight) <= 0) || ((d+rUp-rDown-2*rLeft) <= 0)) {
-		cout << "ERROR: d + rUp - rDown - 2*(rRight and rLeft) > 0" << endl;
-		return Th;
-	}
+func real[int,int] twinPerioPoints(real [int,int] b0, int n0, real yTwin){
+  real[int,int] b1(3,n0);
+  for (int i=0; i<n0; i++){
+    b1(0,(n0-1)-i) = b0(0,i); b1(1,(n0-1)-i) = yTwin;
+  }
+  return computeArchlength(b1,n0,0,n0);
+}
 
-  real thetaDownRight = acos((pow((rDown+rRight),2)+pow(d,2)-pow((rUp-rRight),2))/(2*(rDown+rRight)*d));
-  real thetaDownLeft = acos((pow((rDown+rLeft),2)+pow(d,2)-pow((rUp-rLeft),2))/(2*(rDown+rLeft)*d));
-  real thetaUpRight = acos((pow((rDown+rRight),2)-pow(d,2)-pow((rUp-rRight),2))/(2*(rUp-rRight)*d));
-  real thetaUpLeft = acos((pow((rDown+rLeft),2)-pow(d,2)-pow((rUp-rLeft),2))/(2*(rUp-rLeft)*d));
-	real thetaRight = acos((pow(d,2)-pow((rUp-rRight),2)-pow(rDown+rRight,2))/(2*(rUp-rRight)*(rDown+rRight)));
-	real thetaLeft = acos((pow(d,2)-pow((rUp-rLeft),2)-pow(rDown+rLeft,2))/(2*(rUp-rLeft)*(rDown+rLeft)));
+func real[int,int] linInterpX(real x0, real x1, real y0, int n){
+  real [int,int] b(2,n);
+  real lb = x1-x0;
+  for (int i=0; i<n; i++){
+    real xi = x0 + lb*(real(i)/(n-1));
+    b(0,i) = xi;
+    b(1,i) = y0;
+  }
 
-  real xRight = -(d*(pow(d,2) - (rDown + 2*rRight - rUp)*(rDown + rUp))*cos(symmAxis) -
-    sqrt(-pow(d,2)*(pow(d,2) - pow((rDown + 2*rRight - rUp),2))*(pow(d,2) - pow((rDown + rUp),2)))*sin(symmAxis))/(2*pow(d,2));
-  real yRight = -(d*(pow(d,2) - (rDown + 2*rRight - rUp)*(rDown + rUp))*sin(symmAxis) +
-		sqrt(-pow(d,2)*(pow(d,2) - pow((rDown + 2*rRight - rUp),2))*(pow(d,2) - pow((rDown + rUp),2)))*cos(symmAxis))/(2*pow(d,2));
+  return b;
+}
 
-	real xLeft = -(d*(pow(d,2) - (rDown + 2*rLeft - rUp)*(rDown + rUp))*cos(symmAxis) +
-    sqrt(-pow(d,2)*(pow(d,2) - pow((rDown + 2*rLeft - rUp),2))*(pow(d,2) - pow((rDown + rUp),2)))*sin(symmAxis))/(2*pow(d,2));
-  real yLeft = -(d*(pow(d,2) - (rDown + 2*rLeft - rUp)*(rDown + rUp))*sin(symmAxis) -
-		sqrt(-pow(d,2)*(pow(d,2) - pow((rDown + 2*rLeft - rUp),2))*(pow(d,2) - pow((rDown + rUp),2)))*cos(symmAxis))/(2*pow(d,2));
+func mesh meshSemiplaneSinusoidal(
+  int obd, int ibd, real bLayerThickness, real Lx, real Ly, real Amp, real q, int[int] labels 
+){
 
+  int labelBottom = labels[0];  // 1st periodic boundary (Bottom)
+  int labelTop = labels[1];     // 2nd periodic boundary (Top)
+  int labelRight = labels[2];   // Free boundary (right)
+  int labelLeft = labels[3];    // Fixed boundary, opposed to the free one (left)
 
-  // Define the borders without mesh adaptation
-	border rightArch(t=0, 1){
-    x = xRight + rRight*cos((symmAxis-thetaUpRight-thetaRight)+thetaRight*t);
-    y = yRight + rRight*sin((symmAxis-thetaUpRight-thetaRight)+thetaRight*t);
-    label = labelBnd;}
+  real xMaxBnd = Amp*cos(q*Ly);
 
-  border upArch(t=0, 1){
-    x = rUp*cos((symmAxis-thetaUpRight)+(thetaUpLeft+thetaUpRight)*t);
-    y = rUp*sin((symmAxis-thetaUpRight)+(thetaUpLeft+thetaUpRight)*t);
-    label = labelBnd;}
+  // Defien the borders for both the bulk and the layer meshes
+  border Bottom(t=0, 1){
+    x = -Lx+(Lx+xMaxBnd-bLayerThickness)*t; 
+    y = -Ly;
+    label = labelBottom;
+  }
+  border BottomLayer(t=0, 1){
+    x = xMaxBnd-bLayerThickness*(1-t);
+    y = -Ly;
+    label = labelBottom/*L*/;
+  }
 
-	border leftArch(t=0, 1){
-    x = xLeft + rLeft*cos((symmAxis+thetaUpLeft)+thetaLeft*t);
-    y = yLeft + rLeft*sin((symmAxis+thetaUpLeft)+thetaLeft*t);
-    label = labelBnd;}
-	
-  border downArch(t=0,1){
-    x = -d*cos(symmAxis)+rDown*cos((symmAxis+thetaDownLeft)-(thetaDownLeft+thetaDownRight)*t);
-    y = -d*sin(symmAxis)+rDown*sin((symmAxis+thetaDownLeft)-(thetaDownLeft+thetaDownRight)*t);
-    label = labelBnd;}
+  border Top(t=0, 1){
+    x = xMaxBnd-bLayerThickness-(Lx-bLayerThickness+xMaxBnd)*t; y = Ly; 
+    label = labelTop;
+  }
+  border TopLayer(t=0, 1){
+    x = xMaxBnd-bLayerThickness*t;
+    y = Ly;
+    label = labelTop/*L*/;
+  }
 
-  Th = buildmesh(
-		rightArch(obd*rRight*thetaRight)
-    + upArch(obd*rUp*(thetaUpLeft+thetaUpRight))
-    + leftArch(obd*rLeft*thetaLeft)
-		+ downArch(obd*rDown*(thetaDownLeft+thetaDownRight))
-	);
+  border Left(t=0,1){
+    x = -Lx;
+    y = Ly*(1-2*t);
+    label = labelLeft;
+  }
+
+  // change for a perturbed front, if needed. Mantain extreme points at x=0
+  border Right(t=0,1){
+    x = 0+Amp*cos(q*Ly*(2*t-1));
+    y = Ly*(2*t-1);
+    label = labelRight;
+  }
+  // border Inner(t=0,1){
+  //   x = -bLayerThickness+Amp*cos(q*Ly*(2*t-1));
+  //   y = Ly*(2*t-1);
+  // }
+
+  mesh Th = buildmesh(
+    Bottom(ibd*(Lx-bLayerThickness))
+    + BottomLayer(obd*bLayerThickness)
+    + Right(obd*2.*Ly)
+    /*+ Inner(obd*2.*Ly)*/
+    + TopLayer(obd*bLayerThickness)
+    + Top(ibd*(Lx-bLayerThickness))
+    + Left(ibd*2.*Ly)
+  );
+
+  // Th = change(Th,rmInternalEdges=1);
 
   return Th;
 }
 
-func mesh oneCutSmooth(int obd, real cut,real r0, real rArch, real symmAxis, int labelBnd){
-	// Perturbations of the circular domain with 1 cut, smoth with 1/f = 0
+func mesh periodicRemesh1FreeBnd(
+  mesh Th0,int obd, int ibd, real bLayerThickness, real smoothCoef, int[int] labels
+){
 
-	real cutAxis = symmAxis+pi;
-  real t1 = acos((cos(cut/2.)-(rArch/r0))/(1-(rArch/r0)));
+  int[int] labelPerio = [labels[0],labels[1]]; // Periodic boundaries
+  int labelFree = labels[2];   // Free boundary
+  int labelFixed = labels[3];  // Fixed boundary, opposed to the free one
 
-	// cout << "R0 = " << r0 << ", RArc = " << rArch << ", cut axis = " << cutAxis << endl;
-	// cout << "theta1 = " << t1 << endl;
+  int[int] be(1); // To save begin and ends of the layer curve
+  int minPoints = 5;
+  real eps = pow(10,-9);
 
-	real OxRight = (r0-rArch)*cos(cutAxis+t1);
-	real OyRight = (r0-rArch)*sin(cutAxis+t1);
-	real OxLeft = (r0-rArch)*cos(cutAxis-t1);
-	real OyLeft = (r0-rArch)*sin(cutAxis-t1);
-	real lenCut = sqrt((OxRight-OxLeft)*(OxRight-OxLeft) + (OyRight-OyLeft)*(OyRight-OyLeft));
+  // Extract the non-periodic boundary pieces
+  real[int,int] bFree(3,1); real lFree = extractborder(Th0,labelFree,bFree);             // extract free
+  real[int,int] bFixed(3,1); real lFixed = extractborder(Th0,labelFixed,bFixed);         // extract fixed
 
-	// cout << "O_right = (" << OxRight <<", "<< OyRight <<"); O_left = (" << OxLeft <<", "<< OyLeft <<"); lenCut = " << lenCut << endl;
+  // ------------------------------------------------------------------------------------
+  // Define an inner border that defines the boundary layer through isolines
+  
+  real xLayer = 0;
+  // Find the extreme points of the periodic boundaries
+  real[int] pointsXPerio = [bFixed(0,bFixed.m-1), xLayer, bFree(0,0)];
+  real[int] pointsYPerio = [bFixed(1,bFixed.m-1), bFixed(1,0)];
 
-  border GammaArchLeft(t=0,1){x=OxLeft+rArch*cos(cutAxis-t1*(1-t)); y=OyLeft+rArch*sin(cutAxis-t1*(1-t)); label=labelBnd;}
-	border GammaCut(t=0,1){x=((OxLeft+rArch*cos(cutAxis))+(OxRight-OxLeft)*t);
-													y=((OyLeft+rArch*sin(cutAxis))+(OyRight-OyLeft)*t);label=labelBnd;}
-	border GammaArchRight(t=0,1){x=OxRight+rArch*cos(cutAxis+t1*t); y=OyRight+rArch*sin(cutAxis+t1*t); label=labelBnd;}
-	border GammaArchFront(t=0,1){x=r0*cos(cutAxis+t1+2*(pi-t1)*t);
-													 y=r0*sin(cutAxis+t1+2*(pi-t1)*t);label=labelBnd;}
+  mesh Th = Th0;
+  fespace Dh(Th, P1);
 
-	mesh Th=buildmesh(GammaArchLeft(obd*rArch*t1)
-							+GammaCut(obd*lenCut)
-							+GammaArchRight(obd*rArch*t1)
-							+GammaArchFront(obd*r0*2*(pi-t1))
-							);
+  // Distance function (d is the minimal distance to the boundary)
+  varf vong(B, d)= on(labelFree,B=1);
+  real[int] ong=vong(0,Dh);
+  Dh B =1, d;
+  B[] = ong ? 0 : B[];
+  distance(Th,B,d[]);
+  // plot(Th, d wait=1);
 
-	return Th;
+  // Get the new inner boundary vertices (bLayer is the contour d==bLayerThickness)
+  real[int,int] bLayer(3,1); int nLayer=isoline(Th,d,iso=bLayerThickness,close=0,bLayer,beginend=be);
+  
+  int nInnerLines = be.n/2;
+  // cout << be << endl;
+
+  int[int] nInner(nInnerLines); // numer of points per loop
+  int nCorrectLines = 0; // number of loops with more than minPoints
+  // find number of points and count > minPoints & correct open ends
+  for (int i=0;  i < nInnerLines; i++){
+
+    real lInner = bLayer(2,be(i*2+1)-1);
+    nInner[i] = lround(obd*lInner);
+    if(nInner[i] > minPoints){nCorrectLines++;}
+
+    if(dist((bLayer(0,be(i*2+1)-1)-bLayer(0,be(i*2))),(bLayer(1,be(i*2+1)-1)-bLayer(1,be(i*2)))) > eps){ // Open loop
+      bLayer(1,be(i*2)) = pointsYPerio[0]; // correct y-coords
+      bLayer(1,be(i*2+1)-1) = pointsYPerio[1];
+
+      nLayer = be(i*2+1)-be(i*2); // # points in the layer's isoline
+      xLayer = bLayer(0,be(i*2)); // x-coord of the layer
+      bLayer(0,be(i*2+1)-1) = xLayer; // correct x-coords
+
+      bLayer = computeArchlength(bLayer,bLayer.m,be(2*i),be(2*i+1));
+    }
+  }
+  
+  // if the number of points is less than minPoints, filter the border for safety
+  int[int] nInnerF(nCorrectLines);
+  int[int] beF(2*nCorrectLines);
+
+  for (int i=0;  i < nInnerLines; i++){
+    if(nInner[i] > minPoints){
+      nInnerF[i] = nInner[i];
+      beF[2*i] = be[i*2];
+      beF[2*i+1] = be[i*2+1];
+    }
+  }
+  
+  border Inner(t=0,1;i) {P=Curve(bLayer,beF(i*2),beF(i*2+1)-1,t);} // Inner boundary multi-border
+  // cout << nInner << endl;
+  // ------------------------------------------------------------------------------------------------------------------
+  
+  // Find the extreme points of the periodic boundaries
+  pointsXPerio[1] = xLayer;
+  // cout << pointsXPerio << endl;
+
+  // We take extremaXPerio as the x-cords of the periodic bnds extremes
+  // and extremaYPerio as their y-coords 
+
+  // Chechk the free-perio2 junction point
+  if (abs(bFree(0,0)-bFree(0,bFixed.m-1)) > eps){
+    bFree(0,bFree.m-1) = bFree(0,0); // Correct the x-coord in order to match the points
+    bFree(2,bFree.m-1) = bFree(2,bFree.m-2) + dist(
+      bFree(0,bFree.m-1)-bFree(0,bFree.m-2),
+      bFree(1,bFree.m-1)-bFree(1,bFree.m-2)
+    ); // Update arch-length
+  }
+
+  // Remesh the free boundary using an spline
+  gslspline splineXFree(gslinterpakimaperiodic, bFree(2, :), bFree(0, :)); 	// x(s) akima spline
+  gslspline splineYFree(gslinterpakimaperiodic, bFree(2, :), bFree(1, :)); 	// y(s) akima spline
+
+  int nFree = round(obd*lFree);	// new number of elements (prescribed density obd)
+  border Free(t=0,lFree){
+    x = splineXFree(t);
+    y = splineYFree(t);
+    label = labelFree;
+  }
+
+  // Keep the same vertices for the fixed
+  int nFixed = bFixed.m-1;
+  border Fixed(t=0,1){
+    P = Curve(bFixed,bFixed(2,lround(t*nFixed))/lFixed);
+    label = labelFixed;
+  }
+
+  // Define the periodic boundaries by linear interpolation
+  real lPerioB = pointsXPerio[1]-pointsXPerio[0];
+  real lPerioL = pointsXPerio[2]-pointsXPerio[1];
+  int nPerioB = lround(ibd*lPerioB);
+  int nPerioL = lround(obd*lPerioL);
+  
+  real[int,int] bPerioB = computeArchlength(linInterpX(pointsXPerio[0],pointsXPerio[1],pointsYPerio[0],nPerioB),nPerioB,0,nPerioB);
+  real[int,int] bPerioL = computeArchlength(linInterpX(pointsXPerio[1],pointsXPerio[2],pointsYPerio[0],nPerioL),nPerioL,0,nPerioL);
+
+  // real[int,int] bPerio1B = twinPerioPoints(bPerio0B,pointsYPerio[1],nPerioB);
+  // real[int,int] bPerio1L = twinPerioPoints(bPerio0L,pointsYPerio[1],nPerioL);
+
+  // Tried with diferent options, using splines  is the most robust
+  gslspline splineXPerioB(gslinterpakimaperiodic, bPerioB(2, :), bPerioB(0, :)); 	// x(s) akima spline
+  gslspline splineXPerioL(gslinterpakimaperiodic, bPerioL(2, :), bPerioL(0, :)); 	// x(s) akima spline
+
+  border Perio0B(t=0,lPerioB){
+    label = labelPerio[0];
+    x = splineXPerioB(t); y = pointsYPerio[0];
+  }
+
+  border Perio0L(t=0,lPerioL){
+    label = labelPerio[0];
+    x = splineXPerioL(t); y = pointsYPerio[0];
+  }
+  
+  border Perio1B(t=lPerioB,0){
+    label = labelPerio[1];
+    x = splineXPerioB(t); y = pointsYPerio[1];
+  }
+
+  border Perio1L(t=lPerioL,0){
+    label = labelPerio[1];
+    x = splineXPerioL(t); y = pointsYPerio[1];
+  }
+
+  // plot(
+  //   Perio0B(nPerioB) + Perio0L(nPerioL) + Perio1B(nPerioB) + Perio1L(nPerioL) 
+  //   + Free(nFree) + Fixed(nFixed) /*+ Inner(nInnerF)*/, wait=1
+  // );
+
+  Th = buildmesh(
+    Perio0B(nPerioB) 
+    + Perio0L(nPerioL) 
+    + Perio1B(nPerioB) 
+    + Perio1L(nPerioL) 
+    + Free(nFree) 
+    + Fixed(nFixed) 
+    + Inner(nInnerF)/*,
+    fixedborder=1*/
+  );
+
+  Th = change(Th, rmInternalEdges=1);
+
+  return Th;
 }
 
-func mesh closedRemesh(real[int,int] bnd, real lBnd, int nBnd,real bndLayerLentgh, int obd, int ibd, int labelBnd, real smoothCoef, bool keepPoints, bool bndLayer){
 
-	int[int] be(1); // To save begin and ends of the curve
-	int minPoints = 20;
+// Construct the mesh -------------------------------------------------------------------------------------------------
 
-	// It is not convenient to define a border inside an If
-	// So 1st define all borderd and the apply the If to the mesh generation
+// Common params
+int obd = 35;
+int ibd = 15;
+real bLayerThickness = 0.4;
+real Lx = 2;
+real Ly = 2;
+real Amp = 0.1;
+real qBnd = 4*pi;
 
-	border OuterKeepPoints(t=0,1){ P=Curve(bnd,bnd(2,round(t*(nBnd)))/lBnd);label=labelBnd;}
-	
-	// Remesh the outr boundary using an Akima spline
-	gslspline splineX(gslinterpakima, bnd(2,:), bnd(0,:));
-	gslspline splineY(gslinterpakima, bnd(2,:), bnd(1,:));
+int[int] labels = [1,3,2,4];
 
-	border OuterSpline(t=0,1){x=splineX(t*lBnd); y=splineY(t*lBnd); label=labelBnd;}
-	
-	int nOut = keepPoints? nBnd : round(obd*lBnd);
+mesh Th = meshSemiplaneSinusoidal(obd,ibd,bLayerThickness,Lx,Ly,Amp,qBnd,labels);
 
-	mesh Th0;
-	if (keepPoints) {
-		Th0 = buildmesh(OuterKeepPoints(nOut));
-	} else {
-		Th0 = buildmesh(OuterSpline(nOut));
-	}
+// Extract outer boundary
+// extractborder gives bOut(3,Th.nbe+1) with 1st point == last point
+// for k in (0,Th.nbe-1): 
+//		bOut(0,k) == x coord kth vertex
+//		bOut(1,k) == y coord kth vertex
+//		bOut(2,k) == arch length at the kth vertex
+// real[int,int] bMesh(3,1); real lMesh = extractborder(Th, labelBnd, bMesh);
 
-	if (!bndLayer) {
-		return Th0;
-	}
+plot(Th, wait=1);
 
-	// FEM Spaces
-	fespace Dh(Th0, P1); // For distance function (remeshing scheme) and data exports
+Th = periodicRemesh1FreeBnd(Th,obd,ibd,bLayerThickness,.5,labels);
+// Th = closedRemesh(bMesh,lMesh,bMesh.m-1,bLayerThickness,obd,ibd,labelBnd,.5,0,1); // Custom mesh adaptation
 
-	// Distance function (d is the minimal distance to the boundary)
-	varf vong(B, d)= on(labelBnd,B=1);
-	real[int] ong=vong(0,Dh);
-	Dh B =1, d;
-	B[] = ong ? 0 : B[];
-	distance(Th0,B,d[]);
-	// plot(d,Th0, wait=1);
+// Initial variables for shape characterization
+real Area0 = Th.measure; // Inital Area of the Fluid Domain
+real Xcm0 = int2d(Th)(x)/Area0; //Initial x_cm
+real Ycm0 = int2d(Th)(y)/Area0; //Initial y_cm
 
-	// Just one inner loop
-	// real[int,int] ISO(3,1); int nc=isoline(Th0,d,iso=bndLayerLentgh,close=1,ISO,smoothing=bndLayerLentgh*smoothCoef,ratio=1.e-0);
-	// real lInner=ISO(2,ISO.m-1); // lInner is the perimeter of ISO
-	// border Inner(t=0,1){ P=Curve(ISO,t);label=0;} // Linear interpolation of the inner boundary (simple and robust)
-	// int nInnerFilter = round(ibd*lInner); // new number of elements (prescribed density ibd)
 
-	// Get the new inner boundary vertices (ISO is the contour d==bndLayerLentgh) with multiple loops
-	real[int,int] ISO(3,1); int nc=isoline(Th0,d,iso=bndLayerLentgh,close=0,ISO,beginend=be,smoothing=bndLayerLentgh*smoothCoef,ratio=1.e-0);
-	int nInnerLoops = be.n/2;
-	// cout << be << endl;
+plot(
+  Th,value = true, fill = false, nbiso=64, wait=true, 
+  cmm = "adaptive mesh;  A0="+Area0+",  (xcm0,yxm0)=("+Xcm0+","+Ycm0+")"
+);
 
-	int[int] nInner(nInnerLoops); // numer of points per loop
-	int nCorrectLoops = 0; // number of loops with more than minPoints
-	// find number of points and count > minPoints
-	for (int i=0;  i < nInnerLoops; i++){
-		real lInner=ISO(2,be(i*2+1)-1);
-		nInner[i] = round(ibd*lInner);
-		if(nInner[i] > minPoints){nCorrectLoops++;}
-	}
+func perio=[[labels[0],x],[labels[1],x]]; // Periodicity
 
-	// if the number of points is less than minPoints, filter the border for safety
-	int[int] nInnerFilter(nCorrectLoops);
-	int[int] beFilter(2*nCorrectLoops);
+real finalAmp = .4;
+int NiterTime = 100;
+real dt = finalAmp/NiterTime;
 
-	for (int i=0;  i < nInnerLoops; i++){
-		if(nInner[i] > minPoints){
-			nInnerFilter[i] = nInner[i];
-			beFilter[2*i] = be[i*2];
-			beFilter[2*i+1] = be[i*2+1];
-		}
-	}
-	
-	border Inner(t=0,1;i) {P=Curve(ISO,beFilter(i*2),beFilter(i*2+1)-1,t); label=(labelBnd+1);} // Inner boundary multi-border
-	// cout << nInner << endl;
+int nDfm = 1;
+fespace Vel(Th,[P1b,P1b], periodic=perio); // For the deformation velocity
 
-	mesh Th;
-	if (keepPoints) {
-		// plot(OuterKeepPoints(nOut),Inner(nInnerFilter)/*, wait=1*/
-		Th = buildmesh(OuterKeepPoints(nOut)+Inner(nInnerFilter));
-	} else {
-		// plot(OuterSpline(nOut),Inner(nInnerFilter)/*, wait=1*/
-		Th = buildmesh(OuterSpline(nOut)+Inner(nInnerFilter));
-	}
-	Th = change(Th, rmInternalEdges=1);
-	return Th;
+macro v [v1, v2]  // Velocity field
+macro u [u1, u2]	// Velocity test function
+
+
+// Iterate time
+for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
+  cout << iterTime << endl;
+  // Define a test velocity at the boundary (null in the bulk)
+  varf bndDirichlet(v, u) = on(labels[2], v1 = 1.*cos(qBnd*y))/*+on(labels[3], v1 = -2*cos(y*(2.*pi)))*/;
+  Vel v=[0,0];
+  v1[] = bndDirichlet(0, Vel, tgv = 1.0);
+
+	// Move mesh10
+	// real minT0 = checkmovemesh(Th, [x, y]); // to check for flipped triangles
+	// real minT = checkmovemesh(Th, [x+dt*V1,y+dt*V2]);
+	// cout << "Min triangle area before: "+minT0+" & after: "+minT<<endl;
+	Th = movemesh(Th,[x+dt*v1,y+dt*v2]);
+
+  // Remesh
+  Th = periodicRemesh1FreeBnd(Th,obd,ibd,bLayerThickness,.5,labels);
+  
+  plot(Th,[v1,v2], wait=false, cmm="Time = "+(1+iterTime)*dt);
 }
 
-
-// Manually compute x,y & s for all the boundaries
-// int nBnd = Th.nbe;
-
-// int[int] bConn(nBnd);
-// real[int] xBnd(nBnd+1); real[int] yBnd(nBnd+1); real [int] sBnd(nBnd+1);
-
-// // Define the first element
-// bConn[0] = Th.be(0)[0];
-// xBnd[0] = Th(bConn[0]).x; yBnd[0] = Th(bConn[0]).y;
-// real s = 0;
-// sBnd[0] = s;
-
-// real xprev = xBnd[0]; real yprev = yBnd[0];
-
-// for (int k = 1; k < nBnd; k++){
-//   bConn[k] = Th.be(k)[0];
-//   xBnd[k]=Th(bConn[k]).x; yBnd[k]=Th(bConn[k]).y;
-//   s += dist(xBnd[k]-xprev,yBnd[k]-yprev);
-//   sBnd[k] = s;
-//   xprev = xBnd[k]; yprev = yBnd[k];
-// }
-// xBnd[nBnd]=xBnd[0]; yBnd[nBnd]=yBnd[0];
-// s += sqrt(pow(xBnd[nBnd]-xprev,2)+pow(yBnd[nBnd]-yprev,2));
-// sBnd[nBnd] = s;
-
-
-func mesh meshSemiplane(int obd, int ibd, real bLayerThickness, real Lx, real Ly, real Amp, real qBnd){
-
-	int[int] labelChange = [labelTop,labelBottom];
-
-	mesh Th,ThHalfTop,ThHalfBottom,Thb; // Final mesh (Th) + auxyliary meshes
-
-	real xMaxBnd = Amp*cos(qBnd*Ly);
-
-	// Defien the borders for both the bulk and the layer meshes
-	border Bottom(t=0, 1){x=-Lx+(Lx+xMaxBnd-bLayerThickness)*t; y=-Ly; label=labelBottom;}
-	border BottomLayer(t=0, 1){x=xMaxBnd-bLayerThickness*(1-t); y=-Ly; label=labelBottom;}
-
-	border Top(t=0, 1){x=xMaxBnd-bLayerThickness-(Lx-bLayerThickness+xMaxBnd)*t; y=Ly; label=labelTop;}
-	border TopLayer(t=0, 1){x=xMaxBnd-bLayerThickness*t; y=Ly; label=labelTop;}
-
-	border Left(t=0,1){x=-Lx; y=Ly*(1-2*t); label=labelLeft;}
-
-	// change for a perturbed front, if needed. Mantain extreme points at x=0
-	border Right(t=0,1){x=0+Amp*cos(qBnd*Ly*(2*t-1)); y=Ly*(2*t-1); label=labelRight;}
-	border Inner(t=0,1){x=-bLayerThickness+Amp*cos(qBnd*Ly*(2*t-1)); y=Ly*(2*t-1);}
-
-	Th = buildmesh(
-		Bottom(ibd*(Lx-bLayerThickness))
-		+ BottomLayer(obd*bLayerThickness)
-		+ Right(obd*2.*Ly)
-		+ Inner(obd*2.*Ly)
-		+ TopLayer(obd*bLayerThickness)
-		+ Top(ibd*(Lx-bLayerThickness))
-		+ Left(ibd*2.*Ly)
-	);
-
-	Th = change(Th,rmInternalEdges=1);
-
-	return Th;
-}
+//---------------------------------------------------------------------------------------------------------------------
