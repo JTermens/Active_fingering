@@ -283,14 +283,6 @@ func mesh periodicRemesh1FreeBnd(
 
 // mesh Th = meshSemiplaneSinusoidal(obd,ibd,bLayerThickness,Lx,Ly,Amp,qBnd,labels);
 
-// // Extract outer boundary
-// // extractborder gives bOut(3,Th.nbe+1) with 1st point == last point
-// // for k in (0,Th.nbe-1): 
-// //		bOut(0,k) == x coord kth vertex
-// //		bOut(1,k) == y coord kth vertex
-// //		bOut(2,k) == arch length at the kth vertex
-// // real[int,int] bMesh(3,1); real lMesh = extractborder(Th, labelBnd, bMesh);
-
 // plot(Th, wait=1);
 
 // Th = periodicRemesh1FreeBnd(Th,obd,ibd,bLayerThickness,.5,labels);
