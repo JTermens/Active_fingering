@@ -1,0 +1,74 @@
+// Parameter file for testing optimized sets of parameters
+// and its non-linear stability
+
+verbosity=0;
+
+string rootDir = "/home/joan/Documents/Simul_runs/semiplane_stability";
+string[int] simulNames = [
+  "optimized_lowAmp_0zeta",
+  "optimized_lowAmp_20zeta",
+  "omptimized_highAmp_0zeta",
+  "omptimized_highAmp_20zeta"
+];
+
+
+// Physiscal Parameters
+real h = 5;                   // Monolayer heigth, [μm]
+real Lc = 40;                 // Nematic length, sqrt(K/a), [μm]
+real eta = 30e3;              // Monolayer viscosity, [kPa·s]
+real xi = 0.1;                // Friction coefficient, [kPa·s/μm²]
+real zi = 0.1;                // Traction coefficient, [kPa/μm],
+
+// -Contractility coefficient, [kPa]
+real[int] zetas = [0,-20,0,-20];
+
+// real tscale = eta/(zi*Lc);    // Timescale corresponding to the advance of a flat front, [s]
+// If surface tension
+real gamma = 5.;              // Surface tension, [mN/m]=[kPa·μm]
+
+// Numerical Parameters
+real obd = 45.;               // Outer boundary mesh density
+real ibd = 15.;               // Inner boundary mesh density
+real dt = 0.001;              // Adim. time step
+int NiterTime = 100;          // Number of iterations
+int nSimul = 3;               // Number of simulations
+real rateMaxArea = 1.5;       // Stop the simulation when Area > rateMaxArea * (Initial Area)
+real rateMinArea = 0.5;       // or when Area < rateMinArea * (Initial Area)
+// If surface tension
+real maxNewtonResidu = 1.e-6; // Cutoff residue for the Newton method
+int maxNewtonIter = 10;       // Max num, of iterations for the Newton method
+
+// Save parameters
+bool bsave = 0;               // To save or not
+int dsave = 5;                // Save frame gap
+
+// Domain parameters
+real L0 = 100;
+real qBnd = 4*pi/L0;
+real lambdaBnd = 2*pi/qBnd;
+real[int] Amps = [
+  0.1*lambdaBnd, 0.1*lambdaBnd, 1.5*Lc, 1.5*Lc
+];
+
+
+
+if(debug){
+  
+  cout << "Simulation: " << simulNames[iSimul] << "\n"
+       << " |_ Problem lengths and timescales:" << "\n"
+       << "   |_ L0 = " << L0 << " um" << "\n"
+       << "   |_ lambdaBnd = " << lambdaBnd << " um" << "\n"
+       << "   |_ Amp = " << Amps[iSimul] << " um" << "\n"
+       << "   |_ lambda = " << sqrt(eta/xi) << " um" << "\n"
+       << "   |_ Lc = " << Lc << " um" << "\n"
+       << "   |_ La = " << abs(zetas[iSimul]/zi) << " um" << "\n"
+       << "   |_ tscale = " << eta/(zi*Lc) << " s" << "\n"
+       << "   |_ charact vel = " << 3600*zi*L0*Lc/eta << " um/h" << "\n"
+       << " |_ Adim. parameters:" << "\n"
+       << "   |_ a = " << abs(zetas[iSimul])/(zi*Lc) << "\n"
+       << "   |_ b = " << L0/sqrt(eta/xi) << "\n"
+       << "   |_ c = " << L0/Lc << endl;
+
+  cout << "\nStarting simulations " << iSimul << " ..." << endl;
+}
+
