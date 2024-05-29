@@ -13,7 +13,7 @@ int iSimul = getARGV("-i", 1);
 bool debug = getARGV("-d", 1);
 bool err = 0;
 
-include "param_sets/parameters_MDCK_MCF10a_Blanch.edp"; // load the parameters
+include "param_sets/parameters_optimized.edp"; // load the parameters
 include "lib/meshes.edp"; // load the mesh generation & remeshing functions
 
 string simulName;
@@ -28,10 +28,13 @@ int labelFree = labels[2];
 int labelFixed = labels[3];
 
 func perio=[[1,x],[3,x]]; // Periodicity
+real aVisor = 1.5;
 
 // Problem length & timescales ----------------------------------------------------------------------------------------
-real Amp = Amps[iSimul];    // Initial amplitude of the perturbation)
-real qBnd = qBnds[iSimul];  // Wavenumber of the perturbation
+real Amp = Amps[iSimul];
+real AmpAdim = Amp/L0; // Initial amplitude of the perturbation)
+real qAdim = qBnd*L0;           // Wavenumber of the perturbation
+real window = pi/qAdim + 0.05;
 
 // real Lc = Lcs[iSimul];
 real lambda = sqrt(eta/xi); // hydrodynamic sceening length
@@ -44,14 +47,15 @@ real a = La/Lc;             // Active length, zeta/zi, and effective radius rati
 real b = L0/lambda;         // Effective radius and hydrodynamic length, sqrt(eta/xi), ratio
 real c = L0/Lc;             // Effective radius and nematic length ratio
 real bLayerThickness = 1/c; // Adim. nematic length
+real LxAdim = 2*lambda/L0;
 //---------------------------------------------------------------------------------------------------------------------
 
 
 // Construct the mesh -------------------------------------------------------------------------------------------------
 
-mesh Th = meshSemiplaneSinusoidal(obd,ibd,bLayerThickness,Lx,Ly,Amp,qBnd,labels)
+mesh Th = meshSemiplaneSinusoidal(obd,ibd,bLayerThickness,LxAdim,0.5,AmpAdim,qAdim,labels);
 
-Th = periodicRemesh1FreeBnd(Th,obd,ibd,bLayerThickness,.5,labels) // Custom mesh adaptation
+Th = periodicRemesh1FreeBnd(Th,obd,ibd,bLayerThickness,.5,labels); // Custom mesh adaptation
 
 // Initial variables for shape characterization
 real Area0 = Th.measure; // Inital Area of the Fluid Domain
@@ -79,14 +83,14 @@ if (bsave){
     fileParams.fixed;
     fileParams << "Amp,qbnd,L0,h,Lc,lambda,La,eta,xi,zi,zeta,tscale,dt,dsave"/*<< ",gamma"*/ <<  endl;
     fileParams << "um,1/um,um,um,um,um,um,kPa*s,kPa*s/um^2,kPa/um,kPa,s,adim,adim"/*<< ",kPa*um"*/ << endl;
-    fileParams << Amp    << "," << qBnd   << "," << L0  << "," << h     << "," << Lc    << "," 
-               << lambda << "," << La     << "," << eta << "," << xi    << "," << zi    << "," 
-               << zeta   << "," << tscale << "," << dt  << "," << dsave << /*"," << gamma*/ << endl;// 
+    fileParams << Amp           << "," << qBnd   << "," << L0  << "," << h     << "," << Lc    << "," 
+               << lambda        << "," << La     << "," << eta << "," << xi    << "," << zi    << "," 
+               << zetas[iSimul] << "," << tscale << "," << dt  << "," << dsave << /*"," << gamma <<*/ endl;// 
   }
   // Generate a separate file for the global variables (integrates ones)
   {ofstream fileGlobalSol (simulHomeDir+fileNameGlobalSol);	
     //fileGlobalSol.fixed;
-    fileGlobalSol	<< "Time,Area,dAreadt" << endl;
+    fileGlobalSol	<< "Time,Area,dAreadt,xMaxBnd,yMaxBnd,xMinBnd,yMinBnd" << endl;
   }
 } 
 //---------------------------------------------------------------------------------------------------------------------
@@ -101,6 +105,8 @@ macro p [px, py] //                                 // Polarity vector field
 macro q [qx, qy] //                                 // Polarity test functions
 macro v [vx, vy] //                                 // Velocity vector field
 macro u [ux, uy] //                                 // Velocity test functions
+macro normal [nx, ny] //                            // Normal vectors at the boundary (null outside of it)
+
 
 macro dp [dpxdx,dpxdy,dpydx,dpydy] //               // Gradient of the polarity field
 macro dq [dqxdx,dqxdy,dqydx,dqydy] //               // Gradient of the polarity test functions
@@ -122,24 +128,25 @@ macro Norm(u) dist(u#x,u#y) + 1.e-12 //             // Vector norm + offset to a
 
 
 //FEM spaces ----------------------------------------------------------------------------------------------------------
-fespace Pol(Th, [P2, P2]);          // For polarity vector
-fespace Pola(Th, P2 );              // For |p| (not essential, just visualization)
-fespace dPol(Th,[P2,P2,P2,P2]);     // For the gradient of the polarity vector
+fespace Pol(Th, [P2, P2],periodic=perio);          // For polarity vector
+fespace Pola(Th, P2,periodic=perio);               // For |p| (not essential, just visualization)
+fespace dPol(Th,[P2,P2,P2,P2],periodic=perio);     // For the gradient of the polarity vector
 
-fespace Vel(Th, [P1b, P1b]);        // For velocity vector
-fespace dVel(Th,[P1b,P1b,P1b,P1b]); // For the gradient of the velocity vector
-fespace prodVel(Th, P1b);
+fespace Vel(Th, [P1b, P1b],periodic=perio);        // For velocity vector
+fespace dVel(Th,[P1b,P1b,P1b,P1b],periodic=perio); // For the gradient of the velocity vector
+fespace prodVel(Th, P1b,periodic=perio);
 
-// fespace Vor(Th,P1b);								// To compute the vorticity & divergence
-fespace Nh(Th,[P1,P1]);						  // For the corrected normal vector at the boundary
+//fespace Vor(Th,P1b);                               // To compute the vorticity & divergence
+fespace Nh(Th,[P1,P1],periodic=perio);             // For the corrected normal vector at the boundary
 //---------------------------------------------------------------------------------------------------------------------
 
+// Extract the new boundary for future computations and compute its orientation
+real[int,int] bFree(3,1); real lFree = extractborder(Th, labelFree, bFree);
+int nFree = bFree.m-1; // instead of Th.nbe to avoid problems with mesh labels
 
 // Define & solve the polarity equations ------------------------------------------------------------------------------
 // P2 extension of polarity Dirichlet data
-varf bndDirichlet(pD, q) = 
-  on(labelFree, pDx = N.x) + on(labelFree, pDy = N.y) 
-  + on(labelFixed, pDx = 0) + on(labelFixed, pDy = 0)
+varf bndDirichlet(pD, q) = on(labelFree, pDx = N.x) + on(labelFree, pDy = N.y);
 
 Pol pD=[0,0];
 pDx[] = bndDirichlet(0, Pol, tgv = 1.0);
@@ -174,11 +181,11 @@ px[]=solP(0:Pol.ndof-1);
 p = p + pD;
 
 if (debug) {
-  // plot(Th,px, value = true, fill = true, nbiso = 64, wait = true, cmm = "px", bb=[[-1.1*Ly,-Ly],[Ly,Ly]]);
-  // plot(Th,py, value = true, fill = true, nbiso = 64, wait = true, cmm = "py", bb=[[-1.1*Ly,-Ly],[Ly,Ly]]);
-  plot(Th,p, value = true, fill = true, nbiso = 64, wait = true, cmm = "(px,py)", bb=[[-1.1*Ly,-Ly],[Ly,Ly]]);
+  // plot(Th,px, value = true, fill = true, nbiso = 64, wait = true, cmm = "px", bb=[[-2*0.5,-aVisor*0.5],[aVisor*0.5,aVisor*0.5]]);
+  // plot(Th,py, value = true, fill = true, nbiso = 64, wait = true, cmm = "py", bb=[[-2*0.5,-aVisor*0.5],[aVisor*0.5,aVisor*0.5]]);
+  plot(Th,p, value = true, fill = true, nbiso = 64, wait = true, cmm = "(px,py)", bb=[[-2*0.5,-aVisor*0.5],[aVisor*0.5,aVisor*0.5]]);
   Pola pABS = sqrt(px(x,y)^2 + py(x,y)^2); // Abs(P)
-  plot(Th,pABS, value = true, fill = true, nbiso = 64, wait = true, cmm = "|p|", bb=[[-1.1*Ly,-Ly],[Ly,Ly]]);
+  plot(Th,pABS, value = true, fill = true, nbiso = 64, wait = true, cmm = "|p|", bb=[[-2*0.5,-aVisor*0.5],[aVisor*0.5,aVisor*0.5]]);
 }
 //---------------------------------------------------------------------------------------------------------------------
 
@@ -209,11 +216,11 @@ Vel v=[0,0];
 vx[]=solV(0:Vel.ndof-1);
 
 if (debug) {
-  // plot(Th,vx, value = true, fill = true, nbiso = 64, wait = true, cmm = "vx", bb=[[-1.1*Ly,-Ly],[Ly,Ly]]);
-  // plot(Th,vy, value = true, fill = true, nbiso = 64, wait = true, cmm = "vy", bb=[[-1.1*Ly,-Ly],[Ly,Ly]]);
-  plot(Th,v, value = true, fill = true, nbiso = 64, wait = true, cmm = "(vx,vy)", bb=[[-1.1*Ly,-Ly],[Ly,Ly]]);
+  // plot(Th,vx, value = true, fill = true, nbiso = 64, wait = true, cmm = "vx", bb=[[-2*0.5,-aVisor*0.5],[aVisor*0.5,aVisor*0.5]]);
+  // plot(Th,vy, value = true, fill = true, nbiso = 64, wait = true, cmm = "vy", bb=[[-2*0.5,-aVisor*0.5],[aVisor*0.5,aVisor*0.5]]);
+  plot(Th,v, value = true, fill = true, nbiso = 64, wait = true, cmm = "(vx,vy)", bb=[[-2*0.5,-aVisor*0.5],[aVisor*0.5,aVisor*0.5]]);
   Pola vABS = sqrt(vx(x,y)^2 + vy(x,y)^2); // Abs(P)
-  plot(Th,vABS, value = true, fill = true, nbiso = 64, wait = true, cmm = "|v|", bb=[[-1.1*Ly,-Ly],[Ly,Ly]]);
+  plot(Th,vABS, value = true, fill = true, nbiso = 64, wait = true, cmm = "|v|", bb=[[-2*0.5,-aVisor*0.5],[aVisor*0.5,aVisor*0.5]]);
 }
 //---------------------------------------------------------------------------------------------------------------------
 
@@ -271,6 +278,18 @@ dpydxx[]=solHessPy(0:dPol.ndof-1);
 real Areai = Area0;              // Current area
 real AreaP = Areai;              // Previous area
 real dAreadt = (Areai-AreaP)/dt; // time-derivative of the area (backward)
+
+real[int] maxBnd = [-LxAdim,0];
+real[int] minBnd = [2*LxAdim,0];
+for (int i=0; i<bFree.m; i++){
+  if (abs(bFree(1,i)) < window){
+    if (bFree(0,i) > maxBnd[0]){
+      maxBnd[0] = bFree(0,i); maxBnd[1] = bFree(1,i);
+    } else if (bFree(0,i) < minBnd[0]){
+      minBnd[0] = bFree(0,i); minBnd[1] = bFree(1,i);
+    }
+  }
+}
 //---------------------------------------------------------------------------------------------------------------------
 
 
@@ -284,7 +303,7 @@ for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
 
   // Solve the polarity equation --------------------------------------------------------------------------------------
   // P2 extension of polarity Dirichlet data
-  varf bndDirichlet(pD, q) = on(labelOut, pDx = nx) + on(labelOut, pDy = ny);
+  varf bndDirichlet(pD, q) = on(labelFree, pDx = N.x) + on(labelFree, pDy = N.y);
   Pol pD=[0,0];
   pDx[] = bndDirichlet(0, Pol, tgv = 1.0);
 
@@ -333,7 +352,6 @@ for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
   // Compute the gradient of v for the posterior analysis -------------------------------------------------------------
   varf aGradV(dv, du) = int2d(Th)(dv'*du);
   varf lGradV(dv, du) = int2d(Th)(Grad(vx,vy)'*du);
-
   matrix AGradV = aGradV(dVel, dVel);	// LHS matrix
   real[int] bGradV = lGradV(0, dVel);	// RHS vector
 
@@ -370,6 +388,21 @@ for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
   // Compute the global variables -------------------------------------------------------------------------------------
   Areai = Th.measure;	// Current area
   dAreadt = (Areai-AreaP)/dt; // time-derivative of the area (backward)
+
+  // Extract interface maxima & minima
+  /*real[int,int] bFree(3,1); real */lFree = extractborder(Th,2,bFree); // extract free
+
+  maxBnd = [-LxAdim,0];
+  minBnd = [2*LxAdim,0];
+  for (int i=0; i<bFree.m; i++){
+    if (abs(bFree(1,i)) < window){
+      if (bFree(0,i) > maxBnd[0]){
+        maxBnd[0] = bFree(0,i); maxBnd[1] = bFree(1,i);
+      } else if (bFree(0,i) < minBnd[0]){
+        minBnd[0] = bFree(0,i); minBnd[1] = bFree(1,i);
+      }
+    }
+  }
   //-------------------------------------------------------------------------------------------------------------------
 
   // Export data ------------------------------------------------------------------------------------------------------
@@ -388,7 +421,7 @@ for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
       fileLocalSols.fixed;
       int NbVertices = Th.nv;
       fileLocalSols << "# LocalSolutions" << endl
-                    << "# NumFields: " << 20 << "	NumberVertices: " << NbVertices << " cut: " << cut << " a: " << a << " b: " << b << " c: " << c << endl
+                    << "# NumFields: " << 20 << "	NumberVertices: " << NbVertices << " Amp: " << AmpAdim <<" qBnd: " << qAdim << " a: " << a << " b: " << b << " c: " << c << endl
                     << "# px	py	vx	vy	dpxdx	dpxdy	dpydx	dpydy	dvxdx	dvxdy	dvydx	dvydy	" 
                     << "dpxdxx	dpxdxy	dpxdyx	dpxdyy	dpydxx	dpydxy	dpydyx	dpydyy" << endl;
       for (int i = 0; i < NbVertices; i++){
@@ -409,7 +442,9 @@ for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
     {ofstream fileGlobalSol (simulHomeDir+fileNameGlobalSol, append);
       
       fileGlobalSol.fixed;
-      fileGlobalSol	<< iterTime*dt << "," << Areai << "," << dAreadt << endl;
+      fileGlobalSol	<< iterTime*dt << "," << Areai     << "," << dAreadt << ","
+                    << maxBnd[0]   << "," << maxBnd[1] << ","
+                    << minBnd[0]   << "," << minBnd[1] << endl;
     }
 
     // save the last mesh
@@ -418,7 +453,7 @@ for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
   //-------------------------------------------------------------------------------------------------------------------
 
   // Plot v -----------------------------------------------------------------------------------------------------------
-  if (debug) { // Show it always, regardless of the verbosity
+  // if (debug) { // Show it always, regardless of the verbosity
     Pola vABS = sqrt(vx(x,y)^2 + vy(x,y)^2);
     Pola vCurl = dvydx(x,y) - dvxdy(x,y);
     Pola pABS = sqrt(px(x,y)^2 + py(x,y)^2);
@@ -427,12 +462,13 @@ for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
       fill = true, 
       nbiso = 64, 
       wait = false, 
-      bb=bb=[[-1.1*Ly,-Ly],[Ly,Ly]],
+      bb = [[-2*0.5,-aVisor*0.5],[aVisor*0.5,aVisor*0.5]],
       cmm = "iTime="+(iterTime)+"; "
         +"t="+(dt*iterTime)+"; "
         +"A/A0="+(Areai/Area0)+"; "
+        +"Amp="+(maxBnd[0]-minBnd[0])+"; "
     );
-  }
+  // }
   //-------------------------------------------------------------------------------------------------------------------
 
   
@@ -444,7 +480,7 @@ for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
     // cout << "Min triangle area before: "+minT0+" & after: "+minT<<endl;
     Th = movemesh(Th,[x+dt*vx,y+dt*vy]);
 
-    Th = periodicRemesh1FreeBnd(Th,obd,ibd,bLayerThickness,.5,labels) // Custom mesh adaptation
+    Th = periodicRemesh1FreeBnd(Th,obd,ibd,bLayerThickness,.5,labels); // Custom mesh adaptation
   }
   catch(...) {
     cout << "ERROR: Simulation "+simulNames[iSimul]+" stopped after "+iterTime+" iterations due to a remeshing error" << endl;
