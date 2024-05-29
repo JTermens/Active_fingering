@@ -34,6 +34,29 @@ func real[int,int] linInterpX(real x0, real x1, real y0, int n){
   return b;
 }
 
+func int[int] retrieveIndices(real[int,int] b0, int n0, mesh Th0){
+  int[int] indices(n0);
+
+  int iTri;
+  real eps = 1e-12;
+
+  mesh Th = Th0; // required for Th().nuTriangle to work
+
+  for (int k=0; k<n0; k++){
+    // Find the trinagle index of the kth bnd point
+    iTri = Th(b0(0,k),b0(1,k)).nuTriangle;
+
+    // Find index of the kth bnd point from its triangle index
+    for (int jTri=0; jTri<3; jTri++) {
+      if( abs(Th0[iTri][jTri].x-b0(0,k))<eps && abs(Th0[iTri][jTri].y-b0(1,k))<eps){
+        indices(k) = Th0[iTri][jTri];
+      }
+    }
+  }
+
+  return indices;
+}
+
 func mesh meshSemiplaneSinusoidal(
   int obd, int ibd, real bLayerThickness, real Lx, real Ly, real Amp, real q, int[int] labels 
 ){
@@ -232,8 +255,8 @@ func mesh periodicRemesh1FreeBnd(
   gslspline splineXPerioB(gslinterpakimaperiodic, bPerioB(2, :), bPerioB(0, :)); 	// x(s) akima spline
   gslspline splineXPerioL(gslinterpakimaperiodic, bPerioL(2, :), bPerioL(0, :)); 	// x(s) akima spline
 
-  cout << "(" << bFree(0,0)             << ", " << bFree(1,0)      << ");"
-       << "(" << splineXPerioL(lPerioB) << ", " << pointsYPerio[0] << ");" << endl;
+  // cout << "(" << bFree(0,0)             << ", " << bFree(1,0)      << ");"
+  //      << "(" << splineXPerioL(lPerioB) << ", " << pointsYPerio[0] << ");" << endl;
 
   border Perio0B(t=0,lPerioB){
     label = labelPerio[0];
@@ -312,19 +335,90 @@ func mesh periodicRemesh1FreeBnd(
 // real finalAmp = .4;
 // int NiterTime = 100;
 // real dt = finalAmp/NiterTime;
+// real aVisor = 1.5;
+// real eps =1e-12;
 
 // int nDfm = 1;
 // fespace Vel(Th,[P1b,P1b], periodic=perio); // For the deformation velocity
+// fespace Nh(Th,[P1,P1],periodic=perio);
+// fespace tstNh(Th,[P1,P1]);
+// fespace absNh(Th,P1,periodic=perio);
+// fespace abststNh(Th,P1);
 
-// macro v [v1, v2]  // Velocity field
-// macro u [u1, u2]	// Velocity test function
+// macro v [v1, v2]  //     // Velocity field
+// macro u [u1, u2]	//     // Velocity test function
+// macro normal [nx, ny] // // Normal vectors
+
+// varf bndDirichlet(v, u) = on(labels[2], v1 = N.x/*1.*cos(qBnd*y)*/)+on(labels[2], v2 = N.y);
+// Vel v=[0,0];
+// v1[] = bndDirichlet(0, Vel, tgv = 1.0);
+
+// plot(Th,[v1,v2], wait=true, bb = [[-2*0.5,-aVisor*0.5],[aVisor*0.5,aVisor*0.5]]);
+
+// // Extract interface maxima & minima
+// real[int,int] bFree(3,1); real lFree = extractborder(Th,2,bFree); // extract free
+// int nFree = bFree.m;
+
+// int[int] indicesFree(nFree);
+
+// int iTri;
+// for (int k=0; k<nFree; k++){
+//   // Find the triangle index of the kth bnd point
+//   iTri = Th(bFree(0,k),bFree(1,k)).nuTriangle;
+
+//   // Find index of the kth bnd point from its triangle index
+//   for (int jTri=0; jTri<3; jTri++) {
+//     if( abs(Th[iTri][jTri].x-bFree(0,k))<eps && abs(Th[iTri][jTri].y-bFree(1,k))<eps){
+//       cout << k << " th vertex OK "<< Th[iTri][jTri] << "; "
+//            << "(" << bFree(0,k) << ", " << bFree(1,k) << "); "
+//            << "(" << Th[iTri][jTri].x << ", " << Th[iTri][jTri].y << "); " << endl;
+//       indicesFree(k) = Th[iTri][jTri];
+//     }
+//   }
+// }
+
+// // Correction of the normal vectors at the Free boundary -------------------------------------------------------------------
+
+// tstNh normal = [0,0]; // here the Dof of nx,ny are scramble.
+
+// real[int] nprev(2), npost(2), nmean(2);
+// int[int] idxPost(nFree);
+// int iBndElem; // index of the boundary element
+// real lenprev, lenpost;
+
+// nprev = [(bFree(1,0)-bFree(1,nFree-2)),-(bFree(0,0)-bFree(0,nFree-2))];
+// lenprev = dist(nprev[0],nprev[1]);
+
+// idxPost[nFree-1] = 1;
+// for (int i=0; i>nFree-1; i++){idxPost[i] = i+1;}
+
+
+// for (int k = 0; k < nFree; k++){
+//   npost = [(bFree(1,idxPost(k))-bFree(1,k)),-(bFree(0,k+1)-bFree(0,k))];
+//   lenpost = dist(npost[0],npost[1]);
+  
+//   nmean = nprev*(lenpost/(lenpost+lenprev)) + npost*(lenprev/(lenprev+lenpost));
+//   nmean /= dist(nmean[0],nmean[1]);
+
+//   nx[](2*indicesFree(k))= -nmean[0];
+//   ny[](2*indicesFree(k)+1) = -nmean[1];
+//   nprev = npost; lenprev = lenpost;
+
+//   // absNh absN = sqrt(nx(x,y)^2 + ny(x,y)^2); // Abs(N)
+//   plot(Th,normal, value = true, fill = true, nbiso = 64, wait = true, cmm = "(nx,ny); iter = "+k,bb=[[-2*0.5,-aVisor*0.5],[aVisor*0.5,aVisor*0.5]]);
+// }
+
+// plot(Th,normal, value = true, fill = true, nbiso = 64, wait = true, cmm = "(nx,ny);",bb=[[-2*0.5,-aVisor*0.5],[aVisor*0.5,aVisor*0.5]]);
+
+// //---------------------------------------------------------------------------------------------------------------------
+
 
 
 // // Iterate time
 // for (int iterTime=0 ; iterTime<NiterTime ; iterTime++) {
 //   cout << iterTime << endl;
 //   // Define a test velocity at the boundary (null in the bulk)
-//   varf bndDirichlet(v, u) = on(labels[2], v1 = 1.*cos(qBnd*y))/*+on(labels[3], v1 = -2*cos(y*(2.*pi)))*/;
+//   varf bndDirichlet(v, u) = on(labels[2], v1 = N.x/*1.*cos(qBnd*y)*/)+on(labels[2], v2 = N.y);
 //   Vel v=[0,0];
 //   v1[] = bndDirichlet(0, Vel, tgv = 1.0);
 
@@ -358,7 +452,5 @@ func mesh periodicRemesh1FreeBnd(
 
 //   // Remesh
 //   Th = periodicRemesh1FreeBnd(Th,obd,ibd,bLayerThickness,.5,labels);
-
 // }
-
 //---------------------------------------------------------------------------------------------------------------------
